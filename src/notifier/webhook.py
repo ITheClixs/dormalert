@@ -8,6 +8,8 @@ from src.notifier.base import NotificationEvent
 
 
 class WebhookNotifier:
+    delivery_kind = "webhook"
+
     def __init__(self, webhook_url: str, timeout_seconds: int, logger: logging.Logger | None = None) -> None:
         self.webhook_url = webhook_url
         self.timeout_seconds = timeout_seconds
@@ -41,4 +43,3 @@ class WebhookNotifier:
 
     def close(self) -> None:
         self.client.close()
-

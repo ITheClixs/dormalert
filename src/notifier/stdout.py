@@ -6,6 +6,8 @@ from src.notifier.base import NotificationEvent
 
 
 class StdoutNotifier:
+    delivery_kind = "console"
+
     def __init__(self, logger: logging.Logger | None = None) -> None:
         self.logger = logger or logging.getLogger("dormalert.notifier.console")
 
