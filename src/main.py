@@ -92,7 +92,10 @@ def main() -> None:
 
     if args.command == "run":
         runner = ContinuousRunner(service)
-        runner.run(_selected_sites(site_ids, args.sites))
+        try:
+            runner.run(_selected_sites(site_ids, args.sites))
+        except KeyboardInterrupt:  # pragma: no cover - interactive runtime behavior
+            service.logger.info("Monitor stopped by user")
         return
 
     if args.command == "detect-once":

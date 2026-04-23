@@ -9,17 +9,23 @@ from src.utils.time import utcnow
 
 
 class ContinuousRunner:
+    WAIT_LOG_INTERVAL_SECONDS = 15
+
     def __init__(self, service: DormAlertService) -> None:
         self.service = service
 
     def run(self, site_ids: list[str]) -> None:  # pragma: no cover - exercised in live operation
         next_run = {site_id: utcnow() for site_id in site_ids}
         next_prune = utcnow()
+        next_wait_log = utcnow()
 
         while True:
             now = utcnow()
             due_sites = [site_id for site_id, due_at in next_run.items() if due_at <= now]
             if not due_sites:
+                if now >= next_wait_log:
+                    self.service.log_scheduler_wait(next_run)
+                    next_wait_log = utcnow() + timedelta(seconds=self.WAIT_LOG_INTERVAL_SECONDS)
                 time.sleep(1)
                 continue
 

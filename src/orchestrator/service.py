@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+from datetime import datetime
 from dataclasses import replace
 
 from src.config.models import AppConfig, SubmissionMode
@@ -163,6 +164,38 @@ class DormAlertService:
                     runtime.site_id: runtime.consecutive_failures
                     for runtime in runtimes
                 },
+            },
+        )
+
+    def log_scheduler_wait(self, next_run: dict[str, datetime]) -> None:
+        now = parse_utc_iso(utcnow_iso())
+        next_checks_seconds = {
+            site_id: max(0, int((due_at - now).total_seconds()))
+            for site_id, due_at in sorted(next_run.items())
+        }
+        runtimes = self.store.list_runtime_records()
+        site_states = {runtime.site_id: runtime.last_page_state for runtime in runtimes}
+        active_open_sites = sorted(
+            site_id for site_id, state in site_states.items() if state == "open"
+        )
+        opening_candidate_sites = sorted(
+            site_id for site_id, state in site_states.items() if state == "opening_candidate"
+        )
+
+        if active_open_sites:
+            availability = f"OPEN:{','.join(active_open_sites)}"
+        elif opening_candidate_sites:
+            availability = f"OPENING_CANDIDATE:{','.join(opening_candidate_sites)}"
+        else:
+            availability = "NO_OPENINGS"
+
+        self.logger.info(
+            "Monitor is running; waiting for next scheduled checks",
+            extra={
+                "event": "scheduler_wait",
+                "next_checks_seconds": next_checks_seconds,
+                "site_states": site_states,
+                "availability": availability,
             },
         )
 

@@ -92,15 +92,31 @@ class HumanFormatter(logging.Formatter):
                 f"attempt={extras.get('attempt')}/{extras.get('max_attempts')} error={extras.get('error')}"
             )
         if event == "detection_cycle_complete":
+            state = str(extras.get("state"))
+            transition = bool(extras.get("transition"))
+            change_label = "CHANGE" if transition else "NO_CHANGE"
+            open_hint = " OPEN_SIGNAL" if state == "open" else ""
             return (
-                f"{timestamp} | {level:<7} | detect | site={extras.get('site_id')} "
-                f"state={extras.get('state')} conf={extras.get('confidence')} "
-                f"transition={extras.get('transition')} reason={extras.get('state_reason')}"
+                f"{timestamp} | {level:<7} | detect | {change_label} | site={extras.get('site_id')} "
+                f"state={state}{open_hint} conf={extras.get('confidence')} "
+                f"reason={extras.get('state_reason')}"
             )
         if event == "heartbeat":
             return (
                 f"{timestamp} | {level:<7} | heartbeat | active_openings={extras.get('active_opening_count')} "
                 f"sites={extras.get('site_count')} failures={extras.get('failure_counts')}"
+            )
+        if event == "scheduler_wait":
+            states = extras.get("site_states") or {}
+            if isinstance(states, dict):
+                states_blob = ", ".join(
+                    f"{site}:{state}" for site, state in sorted(states.items())
+                ) or "none"
+            else:
+                states_blob = str(states)
+            return (
+                f"{timestamp} | {level:<7} | scheduler | availability={extras.get('availability')} "
+                f"| states=[{states_blob}] | next_checks_seconds={extras.get('next_checks_seconds')}"
             )
         if event in {"notification_console", "notification_webhook", "notification_email"}:
             return (

@@ -96,6 +96,17 @@ When running continuously (`run`), terminal output is human-readable and concise
 
 Structured JSON logs are still preserved in `logs/app.log` for machine parsing and diagnostics.
 
+If you want frequent checks (for example every 15 seconds), configure both interval and jitter:
+
+```bash
+LIVINGSCIENCE_POLL_INTERVAL_SECONDS=15
+LIVINGSCIENCE_JITTER_SECONDS=0
+STUDENTVILLAGE_POLL_INTERVAL_SECONDS=15
+STUDENTVILLAGE_JITTER_SECONDS=0
+```
+
+With longer intervals, the runner now prints periodic scheduler lines so it is obvious the monitor is still alive and waiting for the next due checks.
+
 ## Operating modes
 
 - `disabled`: no submission attempt.
