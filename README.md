@@ -97,6 +97,40 @@ The current default in `.env.example` is:
 - `livingscience`: `disabled`
 - `studentvillage`: `dry_run`
 
+## Email Alerts
+
+The system now supports SMTP email alerts for opening events.
+
+Set these values in `.env` to enable email delivery:
+
+```bash
+DORMALERT_EMAIL_ENABLED=true
+DORMALERT_SMTP_HOST=smtp.example.com
+DORMALERT_SMTP_PORT=587
+DORMALERT_SMTP_USERNAME=your-user
+DORMALERT_SMTP_PASSWORD=your-password
+DORMALERT_SMTP_STARTTLS=true
+DORMALERT_EMAIL_FROM=alerts@example.com
+DORMALERT_EMAIL_TO=you@example.com
+DORMALERT_ALERT_REMINDER_MINUTES=15
+```
+
+Behavior:
+
+- one email is sent immediately when a site is confirmed `open`
+- reminder emails repeat at the configured interval while the opening remains active
+- reminders stop when the site closes or the opening event is acknowledged
+
+## Operational Commands
+
+```bash
+python3 -m src.main status
+python3 -m src.main list-openings
+python3 -m src.main list-openings --active-only
+python3 -m src.main ack-opening --event-id 1
+python3 -m src.main submit-once --site studentvillage --dry-run
+```
+
 ## Documentation index
 
 - [Technical reconnaissance](docs/reconnaissance.md)
@@ -107,4 +141,3 @@ The current default in `.env.example` is:
 - [Deployment](docs/deployment.md)
 - [Risk register](docs/risk_register.md)
 - [Implementation plan](docs/implementation_plan.md)
-
