@@ -15,6 +15,11 @@ from src.detector.models import (
 )
 from src.utils.time import utcnow_iso
 
+_HIDDEN_VALUE_RE = re.compile(
+    r'(<input[^>]+type=["\']hidden["\'][^>]*value=)["\'][^"\']*["\']',
+    re.IGNORECASE,
+)
+
 
 def _normalize_text(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip().lower()
@@ -22,6 +27,18 @@ def _normalize_text(value: str) -> str:
 
 def _html_text(value: str) -> str:
     return BeautifulSoup(value, "html.parser").get_text(" ", strip=True)
+
+
+def _fingerprint_text(value: str) -> str:
+    from bs4 import Comment  # local import keeps module load fast
+
+    stripped = _HIDDEN_VALUE_RE.sub(r'\1""', value)
+    soup = BeautifulSoup(stripped, "html.parser")
+    for tag in soup(["script", "style", "noscript"]):
+        tag.decompose()
+    for comment in soup.find_all(string=lambda s: isinstance(s, Comment)):
+        comment.extract()
+    return soup.get_text(" ", strip=True)
 
 
 class SiteProfile:
@@ -39,9 +56,10 @@ class SiteProfile:
 
     def _fingerprint(self, probes: Mapping[str, ProbeResult]) -> str:
         digest = hashlib.sha256()
+        digest.update(self.state_version.encode("utf-8"))
         for name in sorted(probes):
             probe = probes[name]
-            normalized = _normalize_text(_html_text(probe.text))[:12000]
+            normalized = _normalize_text(_fingerprint_text(probe.text))[:12000]
             digest.update(name.encode("utf-8"))
             digest.update(str(probe.status_code).encode("utf-8"))
             digest.update(normalized.encode("utf-8"))
