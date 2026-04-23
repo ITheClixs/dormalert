@@ -68,6 +68,14 @@ def build_parser() -> argparse.ArgumentParser:
     mode_group.add_argument("--dry-run", action="store_true")
     mode_group.add_argument("--live", action="store_true")
 
+    openings_parser = subparsers.add_parser("list-openings", help="List opening events")
+    openings_parser.add_argument("--active-only", action="store_true")
+
+    ack_parser = subparsers.add_parser("ack-opening", help="Acknowledge an opening event")
+    ack_parser.add_argument("--event-id", required=True, type=int)
+
+    subparsers.add_parser("status", help="Show runtime status")
+
     return parser
 
 
@@ -102,6 +110,20 @@ def main() -> None:
             mode = service.config.sites[args.site].submission_mode
         result = service.submit_site_once(args.site, mode=mode)
         print(json.dumps(to_jsonable(result), indent=2, ensure_ascii=True))
+        return
+
+    if args.command == "list-openings":
+        result = service.list_openings(active_only=args.active_only)
+        print(json.dumps(to_jsonable(result), indent=2, ensure_ascii=True))
+        return
+
+    if args.command == "ack-opening":
+        result = {"event_id": args.event_id, "acknowledged": service.acknowledge_opening(args.event_id)}
+        print(json.dumps(to_jsonable(result), indent=2, ensure_ascii=True))
+        return
+
+    if args.command == "status":
+        print(json.dumps(to_jsonable(service.status_snapshot()), indent=2, ensure_ascii=True))
         return
 
 

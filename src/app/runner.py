@@ -14,6 +14,7 @@ class ContinuousRunner:
 
     def run(self, site_ids: list[str]) -> None:  # pragma: no cover - exercised in live operation
         next_run = {site_id: utcnow() for site_id in site_ids}
+        next_prune = utcnow()
 
         while True:
             now = utcnow()
@@ -28,3 +29,7 @@ class ContinuousRunner:
                 delay = site_config.poll_interval_seconds + random.uniform(0, site_config.jitter_seconds)
                 next_run[site_id] = utcnow() + timedelta(seconds=delay)
 
+            self.service.log_heartbeat(due_sites)
+            if utcnow() >= next_prune:
+                self.service.prune_old_artifacts()
+                next_prune = utcnow() + timedelta(hours=1)
