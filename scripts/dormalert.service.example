@@ -1,0 +1,16 @@
+[Unit]
+Description=DormAlert dorm opening monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=dormalert
+WorkingDirectory=/opt/dormalert
+EnvironmentFile=/opt/dormalert/.env
+ExecStart=/opt/dormalert/.venv/bin/python -m src.main run
+Restart=always
+RestartSec=15
+
+[Install]
+WantedBy=multi-user.target
