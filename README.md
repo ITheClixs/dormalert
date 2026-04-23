@@ -1,10 +1,16 @@
-# DormAlert
+# DormAlert: Find a student dorm in zurich in only 4 months!!!
 
 DormAlert is a production-oriented dormitory opening monitor built around one core subsystem: a page state detector.
 
 The goal is not blind automation. The goal is to detect the exact moment a dormitory waitlist or application path becomes available again, preserve evidence, alert immediately, and only attempt submission when the site behavior is well understood and the risk is acceptable.
 
 This repository is intentionally structured as a long-running monitoring system rather than a one-off script. Detection, orchestration, persistence, diagnostics, notification, submission, and verification are separated so the system can be operated safely on an always-on host.
+
+## Abstract
+
+As you could already tell, finding a dorm room in zurich in your freshman years (Basisjahr) can be really challenging because there are only limited spots available and ETH does not admit a specific number of people every year. So in this repo I intended to address this issue and make sure me and my people get in front of others by applying extremely fast and by means of this applying instantly after the waitlist opens for the upcoming semester (HS 2026). And yes this repo is going to be gatekept for a while (that while is presumably defined as up until the moment we get a place to live in hoenggerg lol) so don't be mad.
+
+
 
 ## Scope
 
