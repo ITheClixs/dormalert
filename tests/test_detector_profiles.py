@@ -142,3 +142,48 @@ def test_fingerprint_is_stable_across_rotating_tokens_and_scripts() -> None:
 
     assert result_a.fingerprint == result_b.fingerprint
 
+
+def test_fingerprint_text_strips_scripts_styles_comments_and_hidden_values() -> None:
+    from src.detector.profile import _fingerprint_text
+
+    html = (
+        '<html><head>'
+        '<style>.rotating-color { color: red; }</style>'
+        '<script>var token = "AAA";</script>'
+        '<noscript>Please enable JavaScript.</noscript>'
+        '</head><body>'
+        '<!-- build timestamp 2026-04-23T18:00:00Z -->'
+        '<p>Visible text.</p>'
+        '<form><input type="hidden" name="csrf" value="AAA"></form>'
+        '</body></html>'
+    )
+
+    output = _fingerprint_text(html)
+
+    assert "Visible text." in output
+    assert "AAA" not in output
+    assert "rotating-color" not in output
+    assert "enable JavaScript" not in output
+    assert "build timestamp" not in output
+
+
+def test_fingerprint_changes_when_state_version_changes(monkeypatch) -> None:
+    profile = StudentVillageProfile()
+    probes = {
+        "home": make_probe("home", "https://studentvillage.ch/en/", "<p>All rooms are currently occupied</p>" + "x" * 600),
+        "apply": make_probe(
+            "apply",
+            "https://studentvillage.ch/en/apply/",
+            '<p>Currently all rooms are rented. We do not have a waiting list.</p>'
+            '<form id="register_form"><input type="hidden" name="form_token" value="AAA"></form>' + "x" * 600,
+        ),
+        "contact": make_probe("contact", "https://studentvillage.ch/en/contact/", '<p>There are currently no rooms available and we do not have a waiting list.</p>' + "x" * 600),
+    }
+
+    baseline = profile.classify(probes, AntiBotObservation(AntiBotSeverity.INFO)).fingerprint
+
+    monkeypatch.setattr(type(profile), "state_version", "test-bumped-version")
+    bumped = profile.classify(probes, AntiBotObservation(AntiBotSeverity.INFO)).fingerprint
+
+    assert baseline != bumped
+
