@@ -68,3 +68,22 @@ def test_non_html_content_type_forces_failed_state() -> None:
 
     assert execution.result.state is DetectorState.FAILED
     assert "implausible_response" in execution.result.signals
+
+
+def test_plausible_response_proceeds_to_classification() -> None:
+    body = (
+        "<html><body>"
+        + "<p>Unsere Wartelisten sind derzeit voll. Vorübergehend können wir keine neuen Anmeldungen annehmen. "
+        + "Sobald die Warteliste wieder geöffnet ist, wird das Anmeldeformular wieder zur Verfügung stehen.</p>"
+        + ("<p>filler</p>" * 40)
+        + "</body></html>"
+    )
+    client = MagicMock()
+    client.fetch.return_value = _make_probe(200, body, content_type="text/html; charset=utf-8")
+    detector = PageStateDetector(client)
+
+    execution = detector.detect(LivingScienceProfile(), _site_config())
+
+    assert execution.result.state is not DetectorState.FAILED
+    assert "implausible_response" not in execution.result.signals
+    assert execution.result.state is DetectorState.CLOSED

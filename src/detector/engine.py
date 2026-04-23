@@ -25,7 +25,7 @@ MIN_PLAUSIBLE_BODY_CHARS = 500
 def _is_plausible_html(probe: ProbeResult) -> tuple[bool, str | None]:
     if probe.status_code < 200 or probe.status_code >= 300:
         return False, f"status_{probe.status_code}"
-    content_type = (probe.headers.get("content-type") or probe.headers.get("Content-Type") or "").lower()
+    content_type = (probe.headers.get("content-type") or "").lower()
     if "html" not in content_type:
         return False, "non_html_content_type"
     if len(probe.text) < MIN_PLAUSIBLE_BODY_CHARS:
