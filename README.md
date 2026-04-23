@@ -86,6 +86,16 @@ python3 -m src.main detect-once
 python3 -m src.main run --detector-only
 ```
 
+## Console output
+
+When running continuously (`run`), terminal output is human-readable and concise by default, for example:
+
+- probe completion and retry lines
+- per-site detection summaries (`state`, `confidence`, `reason`)
+- heartbeat summaries (active openings and failure counts)
+
+Structured JSON logs are still preserved in `logs/app.log` for machine parsing and diagnostics.
+
 ## Operating modes
 
 - `disabled`: no submission attempt.
