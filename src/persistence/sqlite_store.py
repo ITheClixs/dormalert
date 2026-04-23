@@ -344,6 +344,19 @@ class SQLiteStateStore:
         row = cursor.fetchone()
         return self._row_to_opening_event(row) if row else None
 
+    def get_current_opening(self, site_id: str) -> OpeningEventRecord | None:
+        cursor = self.connection.execute(
+            """
+            SELECT * FROM opening_events
+            WHERE site_id = ? AND status IN ('active', 'acknowledged')
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (site_id,),
+        )
+        row = cursor.fetchone()
+        return self._row_to_opening_event(row) if row else None
+
     def get_opening_event(self, event_id: int) -> OpeningEventRecord | None:
         cursor = self.connection.execute(
             "SELECT * FROM opening_events WHERE id = ?",
@@ -461,7 +474,7 @@ class SQLiteStateStore:
                 closed_at = ?,
                 next_reminder_at = NULL,
                 updated_at = ?
-            WHERE id = ? AND status = 'active'
+            WHERE id = ? AND status IN ('active', 'acknowledged')
             """,
             (utcnow_iso(), utcnow_iso(), event_id),
         )
