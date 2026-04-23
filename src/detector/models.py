@@ -59,6 +59,9 @@ class DetectionResult:
     display_name: str
     state: DetectorState
     confidence: float
+    state_reason: str
+    signal_scores: dict[str, float]
+    state_version: str
     signals: tuple[str, ...]
     facts: tuple[str, ...]
     inferences: tuple[str, ...]
@@ -75,4 +78,3 @@ class DetectionResult:
 class DetectionExecution:
     result: DetectionResult
     probes: tuple[ProbeResult, ...]
-

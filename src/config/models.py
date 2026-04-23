@@ -16,6 +16,15 @@ class NotificationSettings:
     enable_console: bool
     webhook_url: str | None
     webhook_timeout_seconds: int
+    email_enabled: bool
+    smtp_host: str | None
+    smtp_port: int
+    smtp_username: str | None
+    smtp_password: str | None
+    smtp_starttls: bool
+    email_from: str | None
+    email_to: tuple[str, ...]
+    alert_reminder_minutes: int
 
 
 @dataclass(frozen=True)
@@ -126,8 +135,8 @@ class AppConfig:
     notification: NotificationSettings
     browser: BrowserSettings
     failure_alert_threshold: int
+    closed_artifact_retention_days: int
     sites: dict[str, SiteMonitorConfig]
     studentvillage_applicant: StudentVillageApplicant | None
     studentvillage_success_phrases: tuple[str, ...]
     studentvillage_failure_phrases: tuple[str, ...]
-

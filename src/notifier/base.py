@@ -26,6 +26,14 @@ class NotificationEvent:
     timestamp_utc: str = field(default_factory=utcnow_iso)
 
 
+@dataclass(frozen=True)
+class NotificationDelivery:
+    notifier: str
+    delivery_kind: str
+    succeeded: bool
+    error: str | None = None
+
+
 class Notifier(Protocol):
     def send(self, event: NotificationEvent) -> None:
         ...
@@ -36,10 +44,18 @@ class CompositeNotifier:
         self.notifiers = notifiers
         self.logger = logger or logging.getLogger("dormalert.notifier")
 
-    def send(self, event: NotificationEvent) -> None:
+    def send(self, event: NotificationEvent) -> tuple[NotificationDelivery, ...]:
+        deliveries: list[NotificationDelivery] = []
         for notifier in self.notifiers:
             try:
                 notifier.send(event)
+                deliveries.append(
+                    NotificationDelivery(
+                        notifier=notifier.__class__.__name__,
+                        delivery_kind=getattr(notifier, "delivery_kind", notifier.__class__.__name__.lower()),
+                        succeeded=True,
+                    )
+                )
             except Exception as exc:  # pragma: no cover - exercised in live operation
                 self.logger.error(
                     "Notifier failed",
@@ -51,4 +67,12 @@ class CompositeNotifier:
                         "error": str(exc),
                     },
                 )
-
+                deliveries.append(
+                    NotificationDelivery(
+                        notifier=notifier.__class__.__name__,
+                        delivery_kind=getattr(notifier, "delivery_kind", notifier.__class__.__name__.lower()),
+                        succeeded=False,
+                        error=str(exc),
+                    )
+                )
+        return tuple(deliveries)

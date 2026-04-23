@@ -28,6 +28,7 @@ class SiteProfile:
     site_id: str
     display_name: str
     targets: tuple[ProbeTarget, ...]
+    state_version = "2026-04-24.v2"
 
     def classify(
         self,
@@ -51,6 +52,8 @@ class SiteProfile:
         *,
         state: DetectorState,
         confidence: float,
+        state_reason: str,
+        signal_scores: dict[str, float],
         signals: tuple[str, ...],
         facts: tuple[str, ...],
         inferences: tuple[str, ...],
@@ -63,6 +66,9 @@ class SiteProfile:
             display_name=self.display_name,
             state=state,
             confidence=confidence,
+            state_reason=state_reason,
+            signal_scores=signal_scores,
+            state_version=self.state_version,
             signals=signals,
             facts=facts,
             inferences=inferences,
@@ -114,6 +120,12 @@ class LivingScienceProfile(SiteProfile):
             return self._result(
                 state=DetectorState.CLOSED,
                 confidence=0.99,
+                state_reason="known_closed_phrase_present",
+                signal_scores={
+                    "closed_marker_strength": 1.0,
+                    "open_marker_strength": 0.0,
+                    "drift_risk": 0.0,
+                },
                 signals=tuple(signals),
                 facts=tuple(facts),
                 inferences=tuple(inferences),
@@ -132,6 +144,12 @@ class LivingScienceProfile(SiteProfile):
             return self._result(
                 state=DetectorState.OPEN,
                 confidence=0.9,
+                state_reason="closed_phrase_absent_and_form_marker_present",
+                signal_scores={
+                    "closed_marker_strength": 0.0,
+                    "open_marker_strength": 0.95,
+                    "drift_risk": 0.1,
+                },
                 signals=tuple(signals),
                 facts=tuple(facts),
                 inferences=tuple(inferences),
@@ -150,6 +168,12 @@ class LivingScienceProfile(SiteProfile):
         return self._result(
             state=DetectorState.OPENING_CANDIDATE,
             confidence=0.6,
+            state_reason="closed_phrase_absent_without_strong_open_marker",
+            signal_scores={
+                "closed_marker_strength": 0.0,
+                "open_marker_strength": 0.35,
+                "drift_risk": 0.65,
+            },
             signals=tuple(signals),
             facts=tuple(facts),
             inferences=tuple(inferences),
@@ -189,7 +213,11 @@ class StudentVillageProfile(SiteProfile):
         home_closed = self._home_closed in home_text
         apply_closed = self._apply_closed in apply_text
         contact_closed = self._contact_closed in contact_text
-        secondary_closed_visible = self._contact_closed in apply_text or contact_closed
+        secondary_closed_visible = (
+            self._contact_closed in apply_text
+            or self._contact_closed in apply_html
+            or contact_closed
+        )
         register_form_present = 'id="register_form"' in apply_html
         form_token_present = 'name="form_token"' in apply_html
         hashing_present = "regformhash(" in apply_html
@@ -223,11 +251,17 @@ class StudentVillageProfile(SiteProfile):
                 "The secondary 'no rooms available' phrase is currently present on the apply page rather than only on the contact page."
             )
 
-        if home_closed and apply_closed and secondary_closed_visible:
-            facts.append("Closed-state evidence currently aligns across the monitored Student Village content.")
+        if home_closed and apply_closed:
+            facts.append("The strongest Student Village closed-state banners are both present on the home and apply pages.")
             return self._result(
                 state=DetectorState.CLOSED,
-                confidence=0.99,
+                confidence=0.98 if secondary_closed_visible else 0.95,
+                state_reason="strong_home_and_apply_closed_banners_present",
+                signal_scores={
+                    "closed_marker_strength": 0.98 if secondary_closed_visible else 0.92,
+                    "open_marker_strength": 0.15,
+                    "drift_risk": 0.05,
+                },
                 signals=tuple(signals),
                 facts=tuple(facts),
                 inferences=tuple(inferences),
@@ -246,6 +280,12 @@ class StudentVillageProfile(SiteProfile):
             return self._result(
                 state=DetectorState.OPEN,
                 confidence=0.92,
+                state_reason="closed_banners_removed_across_monitored_pages",
+                signal_scores={
+                    "closed_marker_strength": 0.0,
+                    "open_marker_strength": 0.9,
+                    "drift_risk": 0.15,
+                },
                 signals=tuple(signals + ["closed_banners_removed"]),
                 facts=tuple(facts),
                 inferences=tuple(inferences),
@@ -263,6 +303,12 @@ class StudentVillageProfile(SiteProfile):
         return self._result(
             state=DetectorState.OPENING_CANDIDATE,
             confidence=0.66,
+            state_reason="public_pages_changed_but_open_not_confirmed",
+            signal_scores={
+                "closed_marker_strength": 0.45,
+                "open_marker_strength": 0.5,
+                "drift_risk": 0.7,
+            },
             signals=tuple(signals + ["inconsistent_public_state"]),
             facts=tuple(facts),
             inferences=tuple(inferences),

@@ -77,6 +77,13 @@ class PageStateDetector:
             display_name=profile.display_name,
             state=DetectorState.FAILED,
             confidence=0.0,
+            state_reason="probe_failure",
+            signal_scores={
+                "closed_marker_strength": 0.0,
+                "open_marker_strength": 0.0,
+                "drift_risk": 1.0,
+            },
+            state_version=profile.state_version,
             signals=("probe_failure",),
             facts=tuple(f"Probe failure observed: {error}" for error in errors),
             inferences=("The detector could not classify the site with confidence in this cycle.",),

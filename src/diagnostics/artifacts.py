@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 from typing import Any
 
 from src.detector.models import DetectionExecution
 from src.utils.serialization import to_jsonable
-from src.utils.time import timestamp_slug
+from src.utils.time import age_in_days, timestamp_slug
 
 
 class ArtifactManager:
@@ -82,3 +83,26 @@ class ArtifactManager:
 
         return tuple(saved)
 
+    def prune_closed_detection_artifacts(self, retention_days: int) -> int:
+        removed = 0
+        detection_roots = self.base_dir.glob("*/detection/*")
+        for bundle_dir in detection_roots:
+            if not bundle_dir.is_dir():
+                continue
+            result_path = bundle_dir / "detection_result.json"
+            if not result_path.exists():
+                continue
+            try:
+                payload = json.loads(result_path.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            if payload.get("state") != "closed":
+                continue
+            created_at = payload.get("timestamp_utc")
+            if not created_at:
+                continue
+            if age_in_days(created_at) < retention_days:
+                continue
+            shutil.rmtree(bundle_dir, ignore_errors=True)
+            removed += 1
+        return removed
