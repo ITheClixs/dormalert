@@ -18,8 +18,7 @@ class StdoutNotifier:
                 "site_id": event.site_id,
                 "severity": event.severity.value,
                 "title": event.title,
-                "message": event.message,
+                "notification_message": event.message,
                 "payload": event.payload,
             },
         )
-

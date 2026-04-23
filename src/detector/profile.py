@@ -189,6 +189,7 @@ class StudentVillageProfile(SiteProfile):
         home_closed = self._home_closed in home_text
         apply_closed = self._apply_closed in apply_text
         contact_closed = self._contact_closed in contact_text
+        secondary_closed_visible = self._contact_closed in apply_text or contact_closed
         register_form_present = 'id="register_form"' in apply_html
         form_token_present = 'name="form_token"' in apply_html
         hashing_present = "regformhash(" in apply_html
@@ -206,6 +207,8 @@ class StudentVillageProfile(SiteProfile):
             signals.append("apply_closed_banner_present")
         if contact_closed:
             signals.append("contact_closed_banner_present")
+        if secondary_closed_visible and not contact_closed:
+            signals.append("secondary_closed_phrase_present_on_apply_page")
         if register_form_present:
             signals.append("register_form_present")
             facts.append("Student Village register form is present on the apply page.")
@@ -215,9 +218,13 @@ class StudentVillageProfile(SiteProfile):
         if hashing_present:
             signals.append("password_hashing_present")
             facts.append("Student Village apply submit path uses client-side password hashing.")
+        if secondary_closed_visible and not contact_closed:
+            facts.append(
+                "The secondary 'no rooms available' phrase is currently present on the apply page rather than only on the contact page."
+            )
 
-        if home_closed and apply_closed and contact_closed:
-            facts.append("Closed-state banners currently align across the monitored public pages.")
+        if home_closed and apply_closed and secondary_closed_visible:
+            facts.append("Closed-state evidence currently aligns across the monitored Student Village content.")
             return self._result(
                 state=DetectorState.CLOSED,
                 confidence=0.99,
@@ -270,4 +277,3 @@ def build_site_profiles() -> dict[str, SiteProfile]:
         "livingscience": LivingScienceProfile(),
         "studentvillage": StudentVillageProfile(),
     }
-
