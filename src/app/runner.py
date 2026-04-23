@@ -24,7 +24,17 @@ class ContinuousRunner:
                 continue
 
             for site_id in due_sites:
-                self.service.inspect_site(site_id)
+                try:
+                    self.service.inspect_site(site_id)
+                except Exception as exc:
+                    self.service.logger.exception(
+                        "Unhandled site inspection error",
+                        extra={
+                            "event": "site_inspection_exception",
+                            "site_id": site_id,
+                            "error": str(exc),
+                        },
+                    )
                 site_config = self.service.config.sites[site_id]
                 delay = site_config.poll_interval_seconds + random.uniform(0, site_config.jitter_seconds)
                 next_run[site_id] = utcnow() + timedelta(seconds=delay)
