@@ -103,6 +103,10 @@ class LivingScienceProfile(SiteProfile):
         "Unsere Wartelisten sind derzeit voll. Vorübergehend können wir keine neuen Anmeldungen annehmen. "
         "Sobald die Warteliste wieder geöffnet ist, wird das Anmeldeformular wieder zur Verfügung stehen."
     )
+    _closed_marker_full = re.compile(r"wartelisten?\b.{0,40}\bvoll\b", re.IGNORECASE | re.DOTALL)
+    _closed_marker_reopen = re.compile(
+        r"warteliste\b.{0,60}\bgeöffnet\b", re.IGNORECASE | re.DOTALL
+    )
 
     def classify(
         self,
@@ -112,7 +116,12 @@ class LivingScienceProfile(SiteProfile):
         probe = probes["home"]
         text_lower = _normalize_text(_html_text(probe.text))
 
-        closed_visible = self._closed_phrase in text_lower
+        closed_visible_literal = self._closed_phrase in text_lower
+        closed_visible_markers = bool(
+            self._closed_marker_full.search(text_lower)
+            and self._closed_marker_reopen.search(text_lower)
+        )
+        closed_visible = closed_visible_literal or closed_visible_markers
 
         facts: list[str] = [
             "Observed April 23, 2026 closed phrase location on the public page is directly monitorable in HTML.",
@@ -122,7 +131,10 @@ class LivingScienceProfile(SiteProfile):
         uncertainties: list[str] = []
 
         if closed_visible:
-            signals.extend(["closed_phrase_present", "html_monitorable"])
+            if closed_visible_literal:
+                signals.extend(["closed_phrase_present", "html_monitorable"])
+            else:
+                signals.extend(["closed_phrase_markers_present", "html_monitorable"])
             facts.append("Exact livingscience closed-state phrase is present.")
             return self._result(
                 state=DetectorState.CLOSED,

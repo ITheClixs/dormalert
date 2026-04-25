@@ -191,6 +191,25 @@ def test_livingscience_does_not_fire_open_on_incidental_form() -> None:
     assert result.signal_scores["open_marker_strength"] < 0.9
 
 
+def test_livingscience_closed_state_tolerant_to_minor_phrase_edits() -> None:
+    profile = LivingScienceProfile()
+    probe = make_probe(
+        "home",
+        "https://livingscience.ch/wohnen-studieren-zuerich/?L=0",
+        """
+        <html><body>
+        <p>Leider sind unsere Wartelisten derzeit voll.</p>
+        <p>Sobald die Warteliste wieder geöffnet ist, wird das Anmeldeformular wieder verfügbar sein.</p>
+        </body></html>
+        """,
+    )
+
+    result = profile.classify({"home": probe}, AntiBotObservation(AntiBotSeverity.NONE))
+
+    assert result.state is DetectorState.CLOSED
+    assert "closed_phrase_markers_present" in result.signals
+
+
 def test_fingerprint_changes_when_state_version_changes(monkeypatch) -> None:
     profile = StudentVillageProfile()
     probes = {
