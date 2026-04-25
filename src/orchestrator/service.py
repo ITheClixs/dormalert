@@ -168,6 +168,17 @@ class DormAlertService:
         )
 
     def notify_monitor_started(self, site_ids: list[str]) -> tuple[NotificationDelivery, ...]:
+        if not self.config.notification.email_enabled:
+            self.logger.warning(
+                "Startup email was not sent because SMTP email notifications are disabled",
+                extra={
+                    "event": "startup_email_not_configured",
+                    "email_enabled": False,
+                    "email_to": self.config.notification.email_to,
+                    "required_action": "Set DORMALERT_EMAIL_ENABLED=true and configure SMTP settings in .env.",
+                },
+            )
+
         poll_intervals = {
             site_id: self.config.sites[site_id].poll_interval_seconds
             for site_id in site_ids
@@ -195,6 +206,7 @@ class DormAlertService:
                 "event": "monitor_start_notification",
                 "site_ids": site_ids,
                 "delivery_count": len(deliveries),
+                "email_enabled": self.config.notification.email_enabled,
                 "email_succeeded": any(
                     delivery.delivery_kind == "email" and delivery.succeeded
                     for delivery in deliveries

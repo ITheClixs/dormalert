@@ -142,6 +142,8 @@ DORMALERT_EMAIL_TO=demirguven178@gmail.com
 DORMALERT_ALERT_REMINDER_MINUTES=15
 ```
 
+Setting only `DORMALERT_EMAIL_TO` is not enough. DormAlert needs an SMTP sender account because the monitor sends mail directly from the running process.
+
 Behavior:
 
 - one startup email is sent when `python3 -m src.main run` begins

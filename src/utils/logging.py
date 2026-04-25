@@ -123,6 +123,17 @@ class HumanFormatter(logging.Formatter):
                 f"{timestamp} | {level:<7} | notify | site={extras.get('site_id')} "
                 f"type={extras.get('notification_type')}"
             )
+        if event == "startup_email_not_configured":
+            return (
+                f"{timestamp} | {level:<7} | notify | startup email NOT SENT | "
+                f"DORMALERT_EMAIL_ENABLED=false | action={extras.get('required_action')}"
+            )
+        if event == "monitor_start_notification":
+            return (
+                f"{timestamp} | {level:<7} | notify | startup notification | "
+                f"email_enabled={extras.get('email_enabled')} "
+                f"email_succeeded={extras.get('email_succeeded')}"
+            )
         if event in {"notification_email_retry", "notifier_failed", "site_inspection_exception"}:
             return (
                 f"{timestamp} | {level:<7} | {record.name} | "

@@ -222,3 +222,24 @@ def test_monitor_started_notification_is_sent_once_when_requested(tmp_path: Path
     assert event.site_id == "system"
     assert event.payload["monitored_sites"] == ("studentvillage",)
     assert event.payload["detector_only"] is True
+
+
+def test_monitor_started_warns_when_email_is_disabled(tmp_path: Path, caplog) -> None:
+    config = make_config(tmp_path, detector_only=True)
+    notifier = StubNotifier()
+    service = DormAlertService(
+        config=config,
+        profiles={"studentvillage": StubProfile()},
+        detector=StubDetector(make_execution()),
+        store=SQLiteStateStore(config.database_path),
+        artifacts=ArtifactManager(config.artifacts_dir),
+        notifier=notifier,
+        verifier=RuleBasedVerifier(config),
+    )
+
+    service.notify_monitor_started(["studentvillage"])
+
+    assert any(
+        record.__dict__.get("event") == "startup_email_not_configured"
+        for record in caplog.records
+    )
