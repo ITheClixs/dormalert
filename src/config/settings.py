@@ -14,6 +14,9 @@ from src.config.models import (
 from src.utils.env import get_bool, get_csv, get_float, get_int, load_dotenv
 
 
+DEFAULT_ALERT_RECIPIENTS = ("demirguven178@gmail.com",)
+
+
 def _site_config(prefix: str, *, default_interval: int, default_mode: SubmissionMode) -> SiteMonitorConfig:
     return SiteMonitorConfig(
         site_id=prefix.lower(),
@@ -110,7 +113,7 @@ def load_settings(env_file: str | Path = ".env") -> AppConfig:
             smtp_password=os.environ.get("DORMALERT_SMTP_PASSWORD") or None,
             smtp_starttls=get_bool("DORMALERT_SMTP_STARTTLS", True),
             email_from=os.environ.get("DORMALERT_EMAIL_FROM") or None,
-            email_to=get_csv("DORMALERT_EMAIL_TO"),
+            email_to=get_csv("DORMALERT_EMAIL_TO") or DEFAULT_ALERT_RECIPIENTS,
             alert_reminder_minutes=get_int("DORMALERT_ALERT_REMINDER_MINUTES", 15),
         ),
         browser=BrowserSettings(

@@ -356,17 +356,17 @@ class DormAlertService:
         is_initial = opening.last_notified_at is None
         if is_initial:
             event_type = "opening_alert"
-            title = f"[DormAlert][OPEN] {result.display_name} appears open"
+            title = f"DormAlert: {result.display_name} waitlist is open"
             message = (
-                f"{result.display_name} appears open with confidence {result.confidence:.2f}. "
+                f"{result.display_name} reached the confirmed open state with confidence {result.confidence:.2f}. "
                 f"Event #{opening.event_id} was created."
             )
         else:
             reminder_number = max(1, opening.reminder_count)
             event_type = "opening_reminder"
-            title = f"[DormAlert][REMINDER {reminder_number}] {result.display_name} still appears open"
+            title = f"DormAlert reminder {reminder_number}: {result.display_name} waitlist is still open"
             message = (
-                f"{result.display_name} still appears open with confidence {result.confidence:.2f}. "
+                f"{result.display_name} still has a confirmed open state with confidence {result.confidence:.2f}. "
                 f"Event #{opening.event_id} remains active."
             )
 
@@ -379,6 +379,8 @@ class DormAlertService:
             payload={
                 "event_id": opening.event_id,
                 "confidence": result.confidence,
+                "state_reason": result.state_reason,
+                "signals": result.signals,
                 "facts": result.facts,
                 "anti_bot": result.anti_bot.signals,
                 "page_urls": result.page_urls,

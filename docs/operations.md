@@ -83,6 +83,20 @@ Repeated failures:
 
 The system avoids noisy alert storms by deduping repeated identical failures.
 
+## Email alert validation
+
+Confirmed opening events and opening reminders are sent through SMTP when `DORMALERT_EMAIL_ENABLED=true`. The default configured receiver is `demirguven178@gmail.com`.
+
+Before relying on email in production:
+
+1. configure an authenticated SMTP account
+2. keep `DORMALERT_EMAIL_FROM` aligned with the authenticated sender or verified sending domain
+3. confirm SPF, DKIM, and DMARC are active through the mail provider
+4. run `python3 -m src.main test-email`
+5. confirm the test message lands in the receiver inbox, not spam
+
+Application code cannot force inbox placement. The notifier keeps messages plain-text and uses standard transactional headers, but final classification is controlled by the receiving mailbox and sender-domain reputation.
+
 ## Operational safeguards
 
 - conservative polling intervals
@@ -102,4 +116,3 @@ Before enabling live submission:
 4. confirm `studentvillage` field mapping in dry-run mode
 5. configure verification phrases if known
 6. enable live mode only for the supported site
-

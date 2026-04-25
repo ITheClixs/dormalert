@@ -12,6 +12,7 @@ from src.detector.engine import PageStateDetector
 from src.detector.http_client import HttpProbeClient
 from src.detector.profile import build_site_profiles
 from src.diagnostics.artifacts import ArtifactManager
+from src.notifier.base import NotificationEvent, NotificationSeverity
 from src.notifier.registry import build_notifier
 from src.orchestrator.service import DormAlertService
 from src.persistence.sqlite_store import SQLiteStateStore
@@ -74,6 +75,8 @@ def build_parser() -> argparse.ArgumentParser:
     ack_parser = subparsers.add_parser("ack-opening", help="Acknowledge an opening event")
     ack_parser.add_argument("--event-id", required=True, type=int)
 
+    subparsers.add_parser("test-email", help="Send a test email through the configured SMTP notifier")
+
     subparsers.add_parser("status", help="Show runtime status")
 
     return parser
@@ -123,6 +126,30 @@ def main() -> None:
     if args.command == "ack-opening":
         result = {"event_id": args.event_id, "acknowledged": service.acknowledge_opening(args.event_id)}
         print(json.dumps(to_jsonable(result), indent=2, ensure_ascii=True))
+        return
+
+    if args.command == "test-email":
+        if not service.config.notification.email_enabled:
+            raise SystemExit("DORMALERT_EMAIL_ENABLED must be true before running test-email.")
+        deliveries = service.notifier.send(
+            NotificationEvent(
+                event_type="email_test",
+                site_id="system",
+                title="DormAlert email test",
+                message=(
+                    "This is a DormAlert SMTP test message. Receiving it outside spam confirms "
+                    "the local SMTP route is usable before a real waitlist opening."
+                ),
+                severity=NotificationSeverity.INFO,
+                payload={
+                    "facts": (
+                        "This message was triggered manually by python3 -m src.main test-email.",
+                        "Real opening emails are sent only for confirmed open events and reminders.",
+                    ),
+                },
+            )
+        )
+        print(json.dumps(to_jsonable(deliveries), indent=2, ensure_ascii=True))
         return
 
     if args.command == "status":

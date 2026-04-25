@@ -138,7 +138,7 @@ DORMALERT_SMTP_USERNAME=your-user
 DORMALERT_SMTP_PASSWORD=your-password
 DORMALERT_SMTP_STARTTLS=true
 DORMALERT_EMAIL_FROM=alerts@example.com
-DORMALERT_EMAIL_TO=you@example.com
+DORMALERT_EMAIL_TO=demirguven178@gmail.com
 DORMALERT_ALERT_REMINDER_MINUTES=15
 ```
 
@@ -147,6 +147,15 @@ Behavior:
 - one email is sent immediately when a site is confirmed `open`
 - reminder emails repeat at the configured interval while the opening remains active
 - reminders stop when the site closes or the opening event is acknowledged
+- opening-candidate and detector-warning events are not sent through email
+
+Before relying on email alerts, send a real SMTP test and check the receiver inbox:
+
+```bash
+python3 -m src.main test-email
+```
+
+Inbox placement cannot be guaranteed by application code alone. Use an authenticated SMTP sender whose `DORMALERT_EMAIL_FROM` mailbox is authorized by the sending domain, with SPF, DKIM, and DMARC configured by the mail provider. The notifier uses plain-text transactional content and standard `Date`, `Message-ID`, `Reply-To`, and auto-generated mail headers to avoid common spam-filter triggers.
 
 ## Operational Commands
 
@@ -156,6 +165,7 @@ python3 -m src.main list-openings
 python3 -m src.main list-openings --active-only
 python3 -m src.main ack-opening --event-id 1
 python3 -m src.main submit-once --site studentvillage --dry-run
+python3 -m src.main test-email
 ```
 
 ## Documentation index
