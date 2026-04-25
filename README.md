@@ -144,6 +144,7 @@ DORMALERT_ALERT_REMINDER_MINUTES=15
 
 Behavior:
 
+- one startup email is sent when `python3 -m src.main run` begins
 - one email is sent immediately when a site is confirmed `open`
 - reminder emails repeat at the configured interval while the opening remains active
 - reminders stop when the site closes or the opening event is acknowledged

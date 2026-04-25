@@ -199,3 +199,26 @@ def test_closed_state_closes_active_opening(tmp_path: Path) -> None:
     service.inspect_site("studentvillage")
 
     assert service.list_openings(active_only=True) == ()
+
+
+def test_monitor_started_notification_is_sent_once_when_requested(tmp_path: Path) -> None:
+    config = make_config(tmp_path, detector_only=True)
+    notifier = StubNotifier()
+    service = DormAlertService(
+        config=config,
+        profiles={"studentvillage": StubProfile()},
+        detector=StubDetector(make_execution()),
+        store=SQLiteStateStore(config.database_path),
+        artifacts=ArtifactManager(config.artifacts_dir),
+        notifier=notifier,
+        verifier=RuleBasedVerifier(config),
+    )
+
+    service.notify_monitor_started(["studentvillage"])
+
+    assert len(notifier.events) == 1
+    event = notifier.events[0]
+    assert event.event_type == "monitor_started"
+    assert event.site_id == "system"
+    assert event.payload["monitored_sites"] == ("studentvillage",)
+    assert event.payload["detector_only"] is True

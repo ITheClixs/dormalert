@@ -167,6 +167,42 @@ class DormAlertService:
             },
         )
 
+    def notify_monitor_started(self, site_ids: list[str]) -> tuple[NotificationDelivery, ...]:
+        poll_intervals = {
+            site_id: self.config.sites[site_id].poll_interval_seconds
+            for site_id in site_ids
+        }
+        deliveries = self._send_notification(
+            NotificationEvent(
+                event_type="monitor_started",
+                site_id="system",
+                title="DormAlert monitor is running",
+                message=(
+                    "DormAlert continuous monitoring has started. This startup email confirms "
+                    "the process is running and the notification channel is configured."
+                ),
+                severity=NotificationSeverity.INFO,
+                payload={
+                    "monitored_sites": tuple(site_ids),
+                    "detector_only": self.config.detector_only,
+                    "poll_intervals_seconds": poll_intervals,
+                },
+            )
+        )
+        self.logger.info(
+            "Monitor startup notification sent",
+            extra={
+                "event": "monitor_start_notification",
+                "site_ids": site_ids,
+                "delivery_count": len(deliveries),
+                "email_succeeded": any(
+                    delivery.delivery_kind == "email" and delivery.succeeded
+                    for delivery in deliveries
+                ),
+            },
+        )
+        return deliveries
+
     def log_scheduler_wait(self, next_run: dict[str, datetime]) -> None:
         now = parse_utc_iso(utcnow_iso())
         next_checks_seconds = {

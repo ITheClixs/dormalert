@@ -11,7 +11,12 @@ from src.notifier.base import NotificationEvent
 
 class SMTPEmailNotifier:
     delivery_kind = "email"
-    _ALLOWED_EVENT_TYPES = {"opening_alert", "opening_reminder", "email_test"}
+    _ALLOWED_EVENT_TYPES = {
+        "opening_alert",
+        "opening_reminder",
+        "email_test",
+        "monitor_started",
+    }
     _PAYLOAD_FIELDS = (
         ("event_id", "Event ID"),
         ("confidence", "Confidence"),
@@ -21,6 +26,9 @@ class SMTPEmailNotifier:
         ("anti_bot", "Anti-bot signals"),
         ("page_urls", "Page URLs"),
         ("evidence_paths", "Evidence paths"),
+        ("monitored_sites", "Monitored sites"),
+        ("detector_only", "Detector-only mode"),
+        ("poll_intervals_seconds", "Poll intervals seconds"),
     )
 
     def __init__(
@@ -95,10 +103,13 @@ class SMTPEmailNotifier:
         raise RuntimeError(f"SMTP delivery failed after retries: {last_error}")
 
     def _body(self, event: NotificationEvent) -> str:
-        reason = (
-            "DormAlert sent this because the SMTP test command was run."
-            if event.event_type == "email_test"
-            else "DormAlert sent this because the monitor emitted a confirmed opening notification."
+        reason_by_type = {
+            "email_test": "DormAlert sent this because the SMTP test command was run.",
+            "monitor_started": "DormAlert sent this because the continuous monitor process started.",
+        }
+        reason = reason_by_type.get(
+            event.event_type,
+            "DormAlert sent this because the monitor emitted a confirmed opening notification.",
         )
         lines = [
             event.message,

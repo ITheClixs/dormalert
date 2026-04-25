@@ -18,6 +18,7 @@ class ContinuousRunner:
         next_run = {site_id: utcnow() for site_id in site_ids}
         next_prune = utcnow()
         next_wait_log = utcnow()
+        self.service.notify_monitor_started(site_ids)
 
         while True:
             now = utcnow()

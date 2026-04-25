@@ -87,6 +87,8 @@ The system avoids noisy alert storms by deduping repeated identical failures.
 
 Confirmed opening events and opening reminders are sent through SMTP when `DORMALERT_EMAIL_ENABLED=true`. The default configured receiver is `demirguven178@gmail.com`.
 
+The continuous runner also sends one startup email per process invocation. Running `./.venv/bin/python -m src.main run --detector-only` should produce a single `DormAlert monitor is running` email before the first detection cycle.
+
 Before relying on email in production:
 
 1. configure an authenticated SMTP account
