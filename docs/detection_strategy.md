@@ -131,3 +131,36 @@ Each bundle includes:
 - response headers per target
 - detection summary JSON
 
+## 2026-04-23 Reliability upgrade
+
+The detector was hardened against the following failure modes. Each rule has a
+test in `tests/test_detector_profiles.py`, `tests/test_detector_engine.py`, or
+`tests/test_orchestrator_confirmation.py`.
+
+- Responses that are not HTTP 2xx, not `text/html`, or shorter than
+  `MIN_PLAUSIBLE_BODY_CHARS` (500) are classified as `FAILED` with the signal
+  `implausible_response`. Classification never sees them.
+- Fingerprints strip `<script>`, `<style>`, `<noscript>`, and HTML comments
+  before hashing, and seed the digest with `state_version`. This keeps the
+  orchestrator's consecutive-confirmation gate useful even when pages contain
+  rotating tokens, and ensures `state_version` bumps invalidate persisted
+  fingerprints.
+- `livingscience` no longer declares `OPEN` from incidental `<form>` elements
+  on the public page. Until the real reopened application form is observed
+  in production, absence of the closed phrase routes to `OPENING_CANDIDATE`
+  with `state_reason=closed_phrase_absent_pending_operator_verification`.
+- `livingscience` closed-phrase detection matches either the exact literal or
+  both of two tolerant markers (`wartelisten … voll` and `warteliste … geöffnet`),
+  so minor copy edits do not flap the state. The marker branch emits the
+  signal `closed_phrase_markers_present`.
+- `studentvillage` requires a positive structural signal (the `register_form`
+  element with its hidden `form_token`) in addition to banner absence before
+  declaring `OPEN`. Otherwise it holds at `OPENING_CANDIDATE` with
+  `register_form_missing`.
+- The orchestrator's confirmation policy requires the two consecutive matching
+  `OPEN` observations to be at least `DORMALERT_CONFIRMATION_MIN_GAP_SECONDS`
+  (default 60s) apart. The fast-path strength threshold is
+  `DORMALERT_OPEN_SIGNAL_FAST_PATH_STRENGTH` (default 0.95).
+
+`state_version` was bumped to `2026-04-23.reliability-v1` to invalidate
+fingerprints persisted under the old rules.

@@ -36,7 +36,7 @@ class SiteProfile:
     site_id: str
     display_name: str
     targets: tuple[ProbeTarget, ...]
-    state_version = "2026-04-24.v2"
+    state_version = "2026-04-23.reliability-v1"
 
     def classify(
         self,
