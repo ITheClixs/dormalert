@@ -6,6 +6,7 @@ from dataclasses import replace
 from typing import Iterable
 
 from src.app.runner import ContinuousRunner
+from src.app.simulation import run_studentvillage_opening_simulation
 from src.config.models import SubmissionMode
 from src.config.settings import load_settings
 from src.detector.engine import PageStateDetector
@@ -75,6 +76,13 @@ def build_parser() -> argparse.ArgumentParser:
     ack_parser = subparsers.add_parser("ack-opening", help="Acknowledge an opening event")
     ack_parser.add_argument("--event-id", required=True, type=int)
 
+    simulate_parser = subparsers.add_parser(
+        "simulate-opening",
+        help="Simulate a confirmed waitlist opening through the normal notification path",
+    )
+    simulate_parser.add_argument("--site", required=True, choices=("studentvillage",))
+    simulate_parser.add_argument("--send-email", action="store_true")
+
     subparsers.add_parser("test-email", help="Send a test email through the configured SMTP notifier")
 
     subparsers.add_parser("status", help="Show runtime status")
@@ -85,6 +93,29 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
+
+    if args.command == "simulate-opening":
+        if not args.send_email:
+            raise SystemExit("Pass --send-email to send a real simulated opening email.")
+        config = load_settings()
+        if not config.notification.email_enabled:
+            raise SystemExit(
+                "DORMALERT_EMAIL_ENABLED must be true before running simulate-opening --send-email."
+            )
+        configure_logging(config.log_level, config.log_dir / "app.log")
+        try:
+            notifier = build_notifier(config)
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from exc
+        result = run_studentvillage_opening_simulation(
+            config=config,
+            notifier=notifier,
+            send_email=args.send_email,
+        )
+        print(json.dumps(to_jsonable(result), indent=2, ensure_ascii=True))
+        if not result.opening_email_succeeded:
+            raise SystemExit("Simulated opening ran, but no email delivery succeeded.")
+        return
 
     service = _build_service(detector_only_override=getattr(args, "detector_only", False))
     site_ids = [

@@ -204,6 +204,14 @@ The `run --detector-only` command should send exactly one `DormAlert monitor is 
 
 Inbox placement cannot be guaranteed by application code alone. Use an authenticated SMTP sender whose `DORMALERT_EMAIL_FROM` mailbox is authorized by the sending domain, with SPF, DKIM, and DMARC configured by the mail provider. The notifier uses plain-text transactional content and standard `Date`, `Message-ID`, `Reply-To`, and auto-generated mail headers to avoid common spam-filter triggers.
 
+To test the same code path used by a real Student Village opening alert, run:
+
+```bash
+./.venv/bin/python -m src.main simulate-opening --site studentvillage --send-email
+```
+
+This command does not touch the live Student Village site and does not write to the production SQLite database. It uses local fixture HTML, a temporary `/tmp/dormalert-sim-*` database/artifact directory, the real Student Village detector profile, and the normal orchestrator opening notification path. The simulated fixture is seeded as a prior `opening_candidate` older than the configured confirmation gap, then the normal detector run confirms it as `open` and sends a clearly marked `Student Village SIMULATION` opening email.
+
 ## Operational Commands
 
 ```bash
@@ -213,6 +221,7 @@ python3 -m src.main list-openings --active-only
 python3 -m src.main ack-opening --event-id 1
 python3 -m src.main submit-once --site studentvillage --dry-run
 python3 -m src.main test-email
+python3 -m src.main simulate-opening --site studentvillage --send-email
 ```
 
 ## Documentation index
