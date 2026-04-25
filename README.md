@@ -113,6 +113,47 @@ STUDENTVILLAGE_JITTER_SECONDS=0
 
 With longer intervals, the runner now prints periodic scheduler lines so it is obvious the monitor is still alive and waiting for the next due checks.
 
+## Detection Mechanism
+
+DormAlert is built around a conservative page-state detector rather than a simple keyword alert. Each monitored site has a profile in `src/detector/profile.py` that defines the URLs to probe, the closed-state markers, the positive open-state markers, and the fallback behavior when the page changes in an ambiguous way.
+
+Every detection cycle produces a structured `DetectionResult` with:
+
+- `state`: `closed`, `opening_candidate`, `open`, or `failed`
+- `confidence`: numeric confidence for downstream policy
+- `state_reason`: a machine-readable explanation such as `strong_home_and_apply_closed_banners_present`
+- `signals`: concrete observations like `apply_closed_banner_present`, `register_form_present`, or `closed_banners_removed`
+- `facts`, `inferences`, and `uncertainties`: separated so observed page content is not mixed with assumptions
+- `fingerprint`: a semantic hash used by the orchestrator to compare consecutive observations
+
+The detector first validates the raw HTTP response before site-specific classification. A probe is rejected as `failed` if it is not HTTP 2xx, is not HTML, or has a body shorter than `MIN_PLAUSIBLE_BODY_CHARS` (`500`). This prevents maintenance pages, short error bodies, JSON responses, and proxy failures from being misread as an opening.
+
+### Site Rules
+
+`livingscience` is intentionally alert-first. The current public page has a strong closed-state phrase around the waitlist being full. The detector classifies it as `closed` when either the exact phrase or tolerant German markers (`wartelisten ... voll` and `warteliste ... geöffnet`) are present. If the phrase disappears, the profile does not assume the waitlist opened. It emits `opening_candidate` with `closed_phrase_absent_pending_operator_verification` until the real reopened form markup has been observed and mapped.
+
+`studentvillage` is stricter because the apply page can expose a registration form even while the site is closed. Therefore the detector does not treat form presence alone as an opening. It probes three pages:
+
+- home: `https://studentvillage.ch/en/`
+- apply: `https://studentvillage.ch/en/apply/`
+- contact: `https://studentvillage.ch/en/contact/`
+
+The closed state is based on the known closed banners across those pages. A profile-level `open` classification requires all monitored closed banners to be gone and the apply page to still contain the expected structural markers: `id="register_form"` and `name="form_token"`. If banners disappear but the known register form/token structure is missing, the state stays `opening_candidate`, not `open`.
+
+### False-Positive Controls
+
+Several layers prevent false-positive alerts:
+
+- `opening_candidate` is a quarantine state. It records evidence and can warn operators, but SMTP opening emails are only sent for confirmed `open` events and reminders.
+- Semantic fingerprints strip `<script>`, `<style>`, `<noscript>`, and HTML comments before hashing, then seed the digest with `state_version`. This keeps rotating tokens, tracking scripts, and generated timestamps from looking like real state changes.
+- The orchestrator confirmation policy downgrades most first `open` observations to `opening_candidate`. Unless `open_marker_strength` reaches `DORMALERT_OPEN_SIGNAL_FAST_PATH_STRENGTH` (`0.95` by default), the same fingerprint must be observed again after `DORMALERT_CONFIRMATION_MIN_GAP_SECONDS` (`60` by default) before the workflow becomes `open`.
+- Student Village requires both negative evidence and positive structure: closed banners must be removed, and the known register form with `form_token` must still be present. Cookie banners, redesigned placeholder pages, or similar forms without the expected token remain `opening_candidate`.
+- LivingScience cannot currently produce `open` from incidental page changes or unrelated forms. Closed phrase removal is treated as `opening_candidate` until the real application form is characterized.
+- Anti-bot markers are inspected separately. Visible CAPTCHA, hCaptcha, Turnstile, Cloudflare challenge text, or blocking challenge markers force a `failed` result or manual handling instead of an opening alert.
+- Meaningful transitions, candidates, opens, failures, and anti-bot warnings capture artifacts under `artifacts/` so later debugging can inspect the exact HTML, headers, and detection summary that drove the decision.
+
+The main technical effect is that DormAlert prefers a missed early email over a false positive. A site must pass response plausibility, site-specific marker checks, and orchestration confirmation before a waitlist-opening email is emitted.
+
 ## Operating modes
 
 - `disabled`: no submission attempt.
