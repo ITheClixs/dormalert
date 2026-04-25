@@ -220,7 +220,7 @@ class DormAlertService:
             return execution
 
         open_strength = result.signal_scores.get("open_marker_strength", 0.0)
-        if open_strength >= 0.95:
+        if open_strength >= self.config.open_signal_fast_path_strength:
             return execution
 
         same_fingerprint = runtime is not None and runtime.last_fingerprint == result.fingerprint
@@ -228,8 +228,14 @@ class DormAlertService:
             DetectorState.OPEN.value,
             DetectorState.OPENING_CANDIDATE.value,
         }
+        gap_satisfied = False
+        if runtime is not None and runtime.last_transition_at is not None:
+            gap_seconds = (
+                parse_utc_iso(result.timestamp_utc) - parse_utc_iso(runtime.last_transition_at)
+            ).total_seconds()
+            gap_satisfied = gap_seconds >= self.config.confirmation_min_gap_seconds
 
-        if same_fingerprint and prior_positive:
+        if same_fingerprint and prior_positive and gap_satisfied:
             confirmed = replace(
                 result,
                 state=DetectorState.OPEN,

@@ -123,4 +123,6 @@ def load_settings(env_file: str | Path = ".env") -> AppConfig:
         studentvillage_applicant=studentvillage_applicant,
         studentvillage_success_phrases=get_csv("STUDENTVILLAGE_SUCCESS_PHRASES"),
         studentvillage_failure_phrases=get_csv("STUDENTVILLAGE_FAILURE_PHRASES"),
+        confirmation_min_gap_seconds=get_int("DORMALERT_CONFIRMATION_MIN_GAP_SECONDS", 60),
+        open_signal_fast_path_strength=get_float("DORMALERT_OPEN_SIGNAL_FAST_PATH_STRENGTH", 0.95),
     )

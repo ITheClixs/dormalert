@@ -140,3 +140,5 @@ class AppConfig:
     studentvillage_applicant: StudentVillageApplicant | None
     studentvillage_success_phrases: tuple[str, ...]
     studentvillage_failure_phrases: tuple[str, ...]
+    confirmation_min_gap_seconds: int = 60
+    open_signal_fast_path_strength: float = 0.95
