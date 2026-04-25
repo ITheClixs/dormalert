@@ -4,7 +4,7 @@ import hashlib
 import re
 from collections.abc import Mapping
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Comment
 
 from src.detector.models import (
     AntiBotObservation,
@@ -15,12 +15,6 @@ from src.detector.models import (
 )
 from src.utils.time import utcnow_iso
 
-_HIDDEN_VALUE_RE = re.compile(
-    r'(<input[^>]+type=["\']hidden["\'][^>]*value=)["\'][^"\']*["\']',
-    re.IGNORECASE,
-)
-
-
 def _normalize_text(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip().lower()
 
@@ -30,10 +24,7 @@ def _html_text(value: str) -> str:
 
 
 def _fingerprint_text(value: str) -> str:
-    from bs4 import Comment  # local import keeps module load fast
-
-    stripped = _HIDDEN_VALUE_RE.sub(r'\1""', value)
-    soup = BeautifulSoup(stripped, "html.parser")
+    soup = BeautifulSoup(value, "html.parser")
     for tag in soup(["script", "style", "noscript"]):
         tag.decompose()
     for comment in soup.find_all(string=lambda s: isinstance(s, Comment)):
