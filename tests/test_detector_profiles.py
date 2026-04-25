@@ -248,3 +248,55 @@ def test_fingerprint_changes_when_state_version_changes(monkeypatch) -> None:
 
     assert baseline != bumped
 
+
+def test_studentvillage_does_not_fire_open_on_cookie_banner_only_page() -> None:
+    """A page whose visible text is only a cookie consent overlay must not fire OPEN."""
+    profile = StudentVillageProfile()
+    apply_html = (
+        "<div id='cookie-consent'><p>This site uses cookies.</p><button>Accept</button></div>"
+        + "<p>placeholder</p>" * 40
+    )
+    probes = {
+        "home": make_probe("home", "https://studentvillage.ch/en/", apply_html),
+        "apply": make_probe("apply", "https://studentvillage.ch/en/apply/", apply_html),
+        "contact": make_probe("contact", "https://studentvillage.ch/en/contact/", apply_html),
+    }
+
+    result = profile.classify(probes, AntiBotObservation(AntiBotSeverity.INFO))
+
+    assert result.state is DetectorState.OPENING_CANDIDATE
+    assert "register_form_missing" in result.signals
+
+
+def test_livingscience_does_not_fire_open_on_cookie_banner_only_page() -> None:
+    profile = LivingScienceProfile()
+    probe = make_probe(
+        "home",
+        "https://livingscience.ch/wohnen-studieren-zuerich/?L=0",
+        "<div id='cookie'><p>We use cookies.</p></div>" + "<p>x</p>" * 80,
+    )
+
+    result = profile.classify({"home": probe}, AntiBotObservation(AntiBotSeverity.NONE))
+
+    assert result.state is DetectorState.OPENING_CANDIDATE
+    assert result.signal_scores["open_marker_strength"] < 0.9
+
+
+def test_studentvillage_does_not_fire_open_on_registration_form_without_matching_token() -> None:
+    """If the site ships a visually similar form but without the expected hidden form_token, do not fire OPEN."""
+    profile = StudentVillageProfile()
+    probes = {
+        "home": make_probe("home", "https://studentvillage.ch/en/", "<p>Welcome</p>" + "x" * 600),
+        "apply": make_probe(
+            "apply",
+            "https://studentvillage.ch/en/apply/",
+            '<form id="register_form"><input name="email"></form>' + "x" * 600,
+        ),
+        "contact": make_probe("contact", "https://studentvillage.ch/en/contact/", "<p>support</p>" + "x" * 600),
+    }
+
+    result = profile.classify(probes, AntiBotObservation(AntiBotSeverity.INFO))
+
+    assert result.state is DetectorState.OPENING_CANDIDATE
+    assert "register_form_missing" in result.signals
+
