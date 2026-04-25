@@ -126,37 +126,40 @@ The current default in `.env.example` is:
 
 ## Email Alerts
 
-The system now supports SMTP email alerts for opening events.
+The system supports SMTP email alerts for startup checks, confirmed opening events, and opening reminders.
 
-Set these values in `.env` to enable email delivery:
+`DORMALERT_EMAIL_TO=demirguven178@gmail.com` only sets the receiver. DormAlert still needs an authenticated SMTP sender account because the monitor sends mail directly from the running process.
+
+For Gmail SMTP, enable 2-step verification on the sender account, create a Google App Password, and use that app password here:
 
 ```bash
 DORMALERT_EMAIL_ENABLED=true
-DORMALERT_SMTP_HOST=smtp.example.com
+DORMALERT_SMTP_HOST=smtp.gmail.com
 DORMALERT_SMTP_PORT=587
-DORMALERT_SMTP_USERNAME=your-user
-DORMALERT_SMTP_PASSWORD=your-password
+DORMALERT_SMTP_USERNAME=your-sender@gmail.com
+DORMALERT_SMTP_PASSWORD=your-google-app-password
 DORMALERT_SMTP_STARTTLS=true
-DORMALERT_EMAIL_FROM=alerts@example.com
+DORMALERT_EMAIL_FROM=your-sender@gmail.com
 DORMALERT_EMAIL_TO=demirguven178@gmail.com
 DORMALERT_ALERT_REMINDER_MINUTES=15
 ```
 
-Setting only `DORMALERT_EMAIL_TO` is not enough. DormAlert needs an SMTP sender account because the monitor sends mail directly from the running process.
-
 Behavior:
 
-- one startup email is sent when `python3 -m src.main run` begins
+- one startup email is sent when `./.venv/bin/python -m src.main run --detector-only` begins
 - one email is sent immediately when a site is confirmed `open`
 - reminder emails repeat at the configured interval while the opening remains active
 - reminders stop when the site closes or the opening event is acknowledged
 - opening-candidate and detector-warning events are not sent through email
 
-Before relying on email alerts, send a real SMTP test and check the receiver inbox:
+Before relying on email alerts, test the SMTP route and then test the monitor startup email:
 
 ```bash
-python3 -m src.main test-email
+./.venv/bin/python -m src.main test-email
+./.venv/bin/python -m src.main run --detector-only
 ```
+
+The `run --detector-only` command should send exactly one `DormAlert monitor is running` email when the process starts. If no email arrives, check `logs/app.log` for `startup_email_not_configured`, `notification_email_retry`, or `notifier_failed`.
 
 Inbox placement cannot be guaranteed by application code alone. Use an authenticated SMTP sender whose `DORMALERT_EMAIL_FROM` mailbox is authorized by the sending domain, with SPF, DKIM, and DMARC configured by the mail provider. The notifier uses plain-text transactional content and standard `Date`, `Message-ID`, `Reply-To`, and auto-generated mail headers to avoid common spam-filter triggers.
 
