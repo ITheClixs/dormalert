@@ -103,10 +103,8 @@ class LivingScienceProfile(SiteProfile):
         "Unsere Wartelisten sind derzeit voll. Vorübergehend können wir keine neuen Anmeldungen annehmen. "
         "Sobald die Warteliste wieder geöffnet ist, wird das Anmeldeformular wieder zur Verfügung stehen."
     )
-    _closed_marker_full = re.compile(r"wartelisten?\b.{0,40}\bvoll\b", re.IGNORECASE | re.DOTALL)
-    _closed_marker_reopen = re.compile(
-        r"warteliste\b.{0,60}\bgeöffnet\b", re.IGNORECASE | re.DOTALL
-    )
+    _closed_marker_full = re.compile(r"wartelisten?\b[^.]{0,25}\bvoll\b", re.IGNORECASE)
+    _closed_marker_reopen = re.compile(r"warteliste\b[^.]{0,60}\bgeöffnet\b", re.IGNORECASE)
 
     def classify(
         self,
@@ -133,9 +131,13 @@ class LivingScienceProfile(SiteProfile):
         if closed_visible:
             if closed_visible_literal:
                 signals.extend(["closed_phrase_present", "html_monitorable"])
+                facts.append("Exact livingscience closed-state phrase is present.")
             else:
                 signals.extend(["closed_phrase_markers_present", "html_monitorable"])
-            facts.append("Exact livingscience closed-state phrase is present.")
+                facts.append(
+                    "LivingScience closed-state markers (wartelisten…voll and warteliste…geöffnet) "
+                    "are present in the same sentence; exact phrase may have been edited."
+                )
             return self._result(
                 state=DetectorState.CLOSED,
                 confidence=0.99,

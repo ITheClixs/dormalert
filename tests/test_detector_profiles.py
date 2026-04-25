@@ -300,3 +300,21 @@ def test_studentvillage_does_not_fire_open_on_registration_form_without_matching
     assert result.state is DetectorState.OPENING_CANDIDATE
     assert "register_form_missing" in result.signals
 
+
+def test_livingscience_markers_do_not_match_across_a_period() -> None:
+    """An open-state page that uses 'voll' in a different sentence near 'warteliste' must not classify as CLOSED."""
+    profile = LivingScienceProfile()
+    probe = make_probe(
+        "home",
+        "https://livingscience.ch/wohnen-studieren-zuerich/?L=0",
+        """
+        <html><body>
+        <p>Die Warteliste ist jetzt wieder geöffnet. Voll von neuen Möglichkeiten für Sie.</p>
+        </body></html>
+        """,
+    )
+
+    result = profile.classify({"home": probe}, AntiBotObservation(AntiBotSeverity.NONE))
+
+    assert result.state is DetectorState.OPENING_CANDIDATE
+

@@ -46,7 +46,7 @@ Never conflate them. The detector never emits `submitted` or `verified`; the orc
 
 `HttpProbeClient` → per-site `SiteProfile.classify(probes, anti_bot)` → `AntiBotObservation` merge → `_apply_confirmation_policy` (in orchestrator) → artifact capture → persistence.
 
-Site profiles live in `src/detector/profile.py` and bump `state_version` (currently `"2026-04-24.v2"`) whenever classification rules change — this invalidates cached fingerprints.
+Site profiles live in `src/detector/profile.py` and bump `state_version` (currently `"2026-04-23.reliability-v1"`) whenever classification rules change — `state_version` is mixed into the fingerprint digest, so a bump invalidates every persisted fingerprint on the next cycle.
 
 The detector is HTTP-first (httpx + BeautifulSoup). Playwright is reserved for the submitter only. Do not add Playwright to the detection path.
 

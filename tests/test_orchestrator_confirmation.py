@@ -149,3 +149,17 @@ def test_high_strength_open_still_fast_paths_without_gap(tmp_path: Path) -> None
     result = service._apply_confirmation_policy(execution, runtime).result
 
     assert result.state is DetectorState.OPEN
+
+
+def test_confirmation_downgrades_on_first_run_with_no_runtime(tmp_path: Path) -> None:
+    """First-ever observation of a site has runtime=None; OPEN must downgrade."""
+    service = _service(tmp_path)
+    execution = DetectionExecution(
+        result=_open_result(fingerprint="fp1", open_strength=0.9, timestamp="2026-04-23T18:00:00Z"),
+        probes=(),
+    )
+
+    result = service._apply_confirmation_policy(execution, runtime=None).result
+
+    assert result.state is DetectorState.OPENING_CANDIDATE
+    assert result.state_reason == "awaiting_consecutive_open_confirmation"
