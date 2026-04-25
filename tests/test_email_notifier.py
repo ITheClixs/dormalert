@@ -149,3 +149,30 @@ def test_monitor_started_event_is_emailed(monkeypatch) -> None:
     assert "Monitored sites:" in body
     assert "livingscience" in body
     assert "Detector-only mode: True" in body
+
+
+def test_closed_text_missing_event_is_emailed(monkeypatch) -> None:
+    FakeSMTP.instances.clear()
+    monkeypatch.setattr("src.notifier.email_smtp.smtplib.SMTP", FakeSMTP)
+    event = NotificationEvent(
+        event_type="closed_text_missing_alert",
+        site_id="studentvillage",
+        title="DormAlert: Student Village monitored closed text disappeared",
+        message="DormAlert no longer observes the monitored closed/waitlist text.",
+        severity=NotificationSeverity.CRITICAL,
+        payload={
+            "observed_status": "missing",
+            "expected_text": "Currently all rooms are rented. We do not have a waiting list.",
+            "state_reason": "public_pages_changed_but_open_not_confirmed",
+            "signals": ("watched_closed_text_missing",),
+        },
+    )
+
+    _notifier().send(event)
+
+    message = FakeSMTP.instances[0].messages[0]
+    assert message["Subject"] == "DormAlert: Student Village monitored closed text disappeared"
+    body = message.get_content()
+    assert "monitored closed/waitlist text disappeared or changed" in body
+    assert "Expected monitored text:" in body
+    assert "Observed status: missing" in body

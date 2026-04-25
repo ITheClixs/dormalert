@@ -140,11 +140,20 @@ The detector first validates the raw HTTP response before site-specific classifi
 
 The closed state is based on the known closed banners across those pages. A profile-level `open` classification requires all monitored closed banners to be gone and the apply page to still contain the expected structural markers: `id="register_form"` and `name="form_token"`. If banners disappear but the known register form/token structure is missing, the state stays `opening_candidate`, not `open`.
 
+### Immediate Closed-Text Alerts
+
+Separate from confirmed-open detection, DormAlert now watches the exact closed/waitlist text that currently blocks applications:
+
+- LivingScience: `Our waiting lists for rooms and studios are currently full. We are temporarily unable to accept new registrations. As soon as the waiting list is open again, the registration form will be available again. Thank you for your understanding.`
+- Student Village apply page: `Currently all rooms are rented. We do not have a waiting list. If you have any questions, please contact service@livit.ch.`
+
+If either watched text disappears or changes, the detector emits `watched_closed_text_missing` and the orchestrator sends a `closed_text_missing_alert` email immediately for that page fingerprint. This alert is intentionally different from a confirmed opening email: it says the monitored closed text disappeared, includes the expected text, current detector state, state reason, signals, page URLs, and evidence paths, and explicitly states that the system does not yet know what replaced the text.
+
 ### False-Positive Controls
 
 Several layers prevent false-positive alerts:
 
-- `opening_candidate` is a quarantine state. It records evidence and can warn operators, but SMTP opening emails are only sent for confirmed `open` events and reminders.
+- `opening_candidate` is a quarantine state. It records evidence and can warn operators, but SMTP opening emails are only sent for confirmed `open` events and reminders. The exception is the explicit `closed_text_missing_alert`, which is a monitored-text-change warning rather than an opening claim.
 - Semantic fingerprints strip `<script>`, `<style>`, `<noscript>`, and HTML comments before hashing, then seed the digest with `state_version`. This keeps rotating tokens, tracking scripts, and generated timestamps from looking like real state changes.
 - The orchestrator confirmation policy downgrades most first `open` observations to `opening_candidate`. Unless `open_marker_strength` reaches `DORMALERT_OPEN_SIGNAL_FAST_PATH_STRENGTH` (`0.95` by default), the same fingerprint must be observed again after `DORMALERT_CONFIRMATION_MIN_GAP_SECONDS` (`60` by default) before the workflow becomes `open`.
 - Student Village requires both negative evidence and positive structure: closed banners must be removed, and the known register form with `form_token` must still be present. Cookie banners, redesigned placeholder pages, or similar forms without the expected token remain `opening_candidate`.
@@ -189,9 +198,10 @@ Behavior:
 
 - one startup email is sent when `./.venv/bin/python -m src.main run --detector-only` begins
 - one email is sent immediately when a site is confirmed `open`
+- one explicit `closed_text_missing_alert` email is sent when the monitored closed/waitlist text disappears or changes
 - reminder emails repeat at the configured interval while the opening remains active
 - reminders stop when the site closes or the opening event is acknowledged
-- opening-candidate and detector-warning events are not sent through email
+- generic opening-candidate and detector-warning events are not sent through email
 
 Before relying on email alerts, test the SMTP route and then test the monitor startup email:
 

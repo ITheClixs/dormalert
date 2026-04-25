@@ -15,6 +15,11 @@ from src.detector.models import (
 )
 from src.utils.time import utcnow_iso
 
+
+WATCHED_CLOSED_TEXT_PRESENT_SIGNAL = "watched_closed_text_present"
+WATCHED_CLOSED_TEXT_MISSING_SIGNAL = "watched_closed_text_missing"
+
+
 def _normalize_text(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip().lower()
 
@@ -69,6 +74,7 @@ class SiteProfile:
         uncertainties: tuple[str, ...],
         anti_bot: AntiBotObservation,
         probes: Mapping[str, ProbeResult],
+        metadata: dict[str, object] | None = None,
     ) -> DetectionResult:
         return DetectionResult(
             site_id=self.site_id,
@@ -86,6 +92,7 @@ class SiteProfile:
             page_urls=tuple(probe.final_url for probe in probes.values()),
             timestamp_utc=utcnow_iso(),
             fingerprint=self._fingerprint(probes),
+            metadata=metadata or {},
         )
 
 
@@ -94,8 +101,12 @@ class LivingScienceProfile(SiteProfile):
     display_name = "Living Science"
     targets = (
         ProbeTarget(
-            name="home",
-            url="https://livingscience.ch/wohnen-studieren-zuerich/?L=0",
+            name="living_en",
+            url="https://livingscience.ch/wohnen-studieren-zuerich/?L=1",
+        ),
+        ProbeTarget(
+            name="offer_en",
+            url="https://livingscience.ch/angebot-studentenzimmer-zuerich/?id=&L=1",
         ),
     )
 
@@ -103,6 +114,20 @@ class LivingScienceProfile(SiteProfile):
         "Unsere Wartelisten sind derzeit voll. Vorübergehend können wir keine neuen Anmeldungen annehmen. "
         "Sobald die Warteliste wieder geöffnet ist, wird das Anmeldeformular wieder zur Verfügung stehen."
     )
+    _watched_closed_text = (
+        "Our waiting lists for rooms and studios are currently full. "
+        "We are temporarily unable to accept new registrations. "
+        "As soon as the waiting list is open again, the registration form will be available again. "
+        "Thank you for your understanding."
+    )
+    _watched_closed_text_normalized = _normalize_text(_watched_closed_text.rstrip("."))
+    _summary_closed_text = (
+        "Our waiting lists are currently full. "
+        "We are temporarily unable to accept new registrations. "
+        "As soon as the waiting list is open again, the registration form will be available again. "
+        "Thank you for your understanding"
+    )
+    _summary_closed_text_normalized = _normalize_text(_summary_closed_text)
     _closed_marker_full = re.compile(r"wartelisten?\b[^.]{0,25}\bvoll\b", re.IGNORECASE)
     _closed_marker_reopen = re.compile(r"warteliste\b[^.]{0,60}\bgeöffnet\b", re.IGNORECASE)
 
@@ -111,15 +136,36 @@ class LivingScienceProfile(SiteProfile):
         probes: Mapping[str, ProbeResult],
         anti_bot: AntiBotObservation,
     ) -> DetectionResult:
-        probe = probes["home"]
-        text_lower = _normalize_text(_html_text(probe.text))
+        text_by_target = {
+            name: _normalize_text(_html_text(probe.text))
+            for name, probe in probes.items()
+        }
+        combined_text = " ".join(text_by_target.values())
 
-        closed_visible_literal = self._closed_phrase in text_lower
-        closed_visible_markers = bool(
-            self._closed_marker_full.search(text_lower)
-            and self._closed_marker_reopen.search(text_lower)
+        watched_text_present = any(
+            self._watched_closed_text_normalized in text
+            for text in text_by_target.values()
         )
-        closed_visible = closed_visible_literal or closed_visible_markers
+        watched_text_targets = tuple(
+            name
+            for name, text in text_by_target.items()
+            if self._watched_closed_text_normalized in text
+        )
+        summary_closed_visible = any(
+            self._summary_closed_text_normalized in text
+            for text in text_by_target.values()
+        )
+        closed_visible_literal = self._closed_phrase in combined_text
+        closed_visible_markers = bool(
+            self._closed_marker_full.search(combined_text)
+            and self._closed_marker_reopen.search(combined_text)
+        )
+        closed_visible = (
+            watched_text_present
+            or summary_closed_visible
+            or closed_visible_literal
+            or closed_visible_markers
+        )
 
         facts: list[str] = [
             "Observed April 23, 2026 closed phrase location on the public page is directly monitorable in HTML.",
@@ -127,9 +173,36 @@ class LivingScienceProfile(SiteProfile):
         signals: list[str] = []
         inferences: list[str] = []
         uncertainties: list[str] = []
+        watched_metadata: dict[str, object] = {
+            "watched_closed_text": self._watched_closed_text,
+            "watched_closed_text_status": "present" if watched_text_present else "missing",
+            "watched_closed_text_targets": watched_text_targets,
+            "watched_closed_text_note": (
+                "This exact English LivingScience rooms-and-studios waitlist text is monitored "
+                "as an immediate disappearance/change signal."
+            ),
+        }
+
+        if watched_text_present:
+            signals.append(WATCHED_CLOSED_TEXT_PRESENT_SIGNAL)
+            facts.append("The monitored LivingScience English waitlist text is present.")
+        else:
+            signals.append(WATCHED_CLOSED_TEXT_MISSING_SIGNAL)
+            facts.append(
+                "The monitored LivingScience English waitlist text is absent or changed."
+            )
+            inferences.append(
+                "This does not prove applications are open; it proves the watched closed-state text changed or disappeared."
+            )
 
         if closed_visible:
-            if closed_visible_literal:
+            if watched_text_present:
+                signals.extend(["closed_phrase_present", "html_monitorable"])
+                facts.append("Exact monitored LivingScience English closed-state phrase is present.")
+            elif summary_closed_visible:
+                signals.extend(["closed_phrase_present", "html_monitorable"])
+                facts.append("LivingScience summary closed-state phrase is present.")
+            elif closed_visible_literal:
                 signals.extend(["closed_phrase_present", "html_monitorable"])
                 facts.append("Exact livingscience closed-state phrase is present.")
             else:
@@ -153,6 +226,7 @@ class LivingScienceProfile(SiteProfile):
                 uncertainties=tuple(uncertainties),
                 anti_bot=anti_bot,
                 probes=probes,
+                metadata=watched_metadata,
             )
 
         signals.append("closed_phrase_absent")
@@ -179,6 +253,7 @@ class LivingScienceProfile(SiteProfile):
             uncertainties=tuple(uncertainties),
             anti_bot=anti_bot,
             probes=probes,
+            metadata=watched_metadata,
         )
 
 
@@ -193,6 +268,10 @@ class StudentVillageProfile(SiteProfile):
 
     _home_closed = "all rooms are currently occupied"
     _apply_closed = "currently all rooms are rented. we do not have a waiting list."
+    _apply_closed_full = (
+        "currently all rooms are rented. we do not have a waiting list. "
+        "if you have any questions, please contact service@livit.ch."
+    )
     _contact_closed = "there are currently no rooms available and we do not have a waiting list."
 
     def classify(
@@ -212,6 +291,7 @@ class StudentVillageProfile(SiteProfile):
         home_closed = self._home_closed in home_text
         apply_closed = self._apply_closed in apply_text
         contact_closed = self._contact_closed in contact_text
+        watched_text_present = self._apply_closed_full in apply_text
         secondary_closed_visible = (
             self._contact_closed in apply_text
             or self._contact_closed in apply_html
@@ -227,6 +307,29 @@ class StudentVillageProfile(SiteProfile):
         signals: list[str] = []
         inferences: list[str] = []
         uncertainties: list[str] = []
+        watched_metadata: dict[str, object] = {
+            "watched_closed_text": (
+                "Currently all rooms are rented. We do not have a waiting list. "
+                "If you have any questions, please contact service@livit.ch."
+            ),
+            "watched_closed_text_status": "present" if watched_text_present else "missing",
+            "watched_closed_text_targets": ("apply",) if watched_text_present else (),
+            "watched_closed_text_note": (
+                "This exact Student Village apply-page banner is monitored as an immediate disappearance/change signal."
+            ),
+        }
+
+        if watched_text_present:
+            signals.append(WATCHED_CLOSED_TEXT_PRESENT_SIGNAL)
+            facts.append("The monitored Student Village apply-page closed banner is present.")
+        else:
+            signals.append(WATCHED_CLOSED_TEXT_MISSING_SIGNAL)
+            facts.append(
+                "The monitored Student Village apply-page closed banner is absent or changed."
+            )
+            inferences.append(
+                "This does not prove rooms are available; it proves the watched closed-state banner changed or disappeared."
+            )
 
         if home_closed:
             signals.append("home_closed_banner_present")
@@ -267,6 +370,7 @@ class StudentVillageProfile(SiteProfile):
                 uncertainties=tuple(uncertainties),
                 anti_bot=anti_bot,
                 probes=probes,
+                metadata=watched_metadata,
             )
 
         if not apply_closed and not home_closed and not contact_closed:
@@ -293,6 +397,7 @@ class StudentVillageProfile(SiteProfile):
                     uncertainties=tuple(uncertainties),
                     anti_bot=anti_bot,
                     probes=probes,
+                    metadata=watched_metadata,
                 )
 
             signals.append("register_form_missing")
@@ -319,6 +424,7 @@ class StudentVillageProfile(SiteProfile):
                 uncertainties=tuple(uncertainties),
                 anti_bot=anti_bot,
                 probes=probes,
+                metadata=watched_metadata,
             )
 
         inferences.append(
@@ -342,6 +448,7 @@ class StudentVillageProfile(SiteProfile):
             uncertainties=tuple(uncertainties),
             anti_bot=anti_bot,
             probes=probes,
+            metadata=watched_metadata,
         )
 
 

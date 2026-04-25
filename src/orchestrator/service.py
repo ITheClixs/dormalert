@@ -8,7 +8,7 @@ from dataclasses import replace
 from src.config.models import AppConfig, SubmissionMode
 from src.detector.engine import PageStateDetector
 from src.detector.models import DetectionExecution, DetectionResult, DetectorState, WorkflowState
-from src.detector.profile import SiteProfile
+from src.detector.profile import SiteProfile, WATCHED_CLOSED_TEXT_MISSING_SIGNAL
 from src.diagnostics.artifacts import ArtifactManager
 from src.notifier.base import NotificationDelivery, NotificationEvent, NotificationSeverity
 from src.persistence.sqlite_store import OpeningEventRecord, SQLiteStateStore
@@ -100,6 +100,7 @@ class DormAlertService:
         )
 
         self._handle_detection_notifications(execution.result, transition, runtime, consecutive_failures)
+        self._handle_watched_closed_text_notification(execution.result)
         self._reconcile_opening_event(execution)
 
         if execution.result.state is DetectorState.OPEN:
@@ -348,6 +349,66 @@ class DormAlertService:
                     },
                 )
             )
+
+    def _handle_watched_closed_text_notification(self, result: DetectionResult) -> None:
+        if WATCHED_CLOSED_TEXT_MISSING_SIGNAL not in result.signals:
+            return
+
+        expected_text = str(result.metadata.get("watched_closed_text") or "")
+        status = str(result.metadata.get("watched_closed_text_status") or "missing")
+        title = f"DormAlert: {result.display_name} monitored closed text disappeared"
+        message = (
+            f"DormAlert no longer observes the monitored closed/waitlist text for {result.display_name}. "
+            "This does not prove the waitlist is open; it means the exact watched text changed or disappeared. "
+            f"Current detector state is {result.state.value} with confidence {result.confidence:.2f}."
+        )
+        event = NotificationEvent(
+            event_type="closed_text_missing_alert",
+            site_id=result.site_id,
+            title=title,
+            message=message,
+            severity=NotificationSeverity.CRITICAL,
+            payload={
+                "observed_status": status,
+                "expected_text": expected_text,
+                "state_reason": result.state_reason,
+                "confidence": result.confidence,
+                "signals": result.signals,
+                "facts": result.facts,
+                "inferences": result.inferences,
+                "page_urls": result.page_urls,
+                "evidence_paths": result.evidence_paths,
+            },
+        )
+        dedupe_key = f"watched_closed_text_missing:{result.site_id}:{result.fingerprint}"
+        if self.store.action_exists(dedupe_key):
+            return
+
+        deliveries = self._send_notification(event)
+        if self.config.notification.email_enabled and not any(
+            delivery.delivery_kind == "email" and delivery.succeeded
+            for delivery in deliveries
+        ):
+            self.logger.warning(
+                "Watched closed text alert did not reach email",
+                extra={
+                    "event": "watched_closed_text_notification_failed",
+                    "site_id": result.site_id,
+                    "fingerprint": result.fingerprint,
+                },
+            )
+            return
+
+        self.store.remember_action(
+            action_key=dedupe_key,
+            site_id=result.site_id,
+            action_type="notify",
+            details={
+                "event_type": event.event_type,
+                "title": event.title,
+                "watched_closed_text_status": status,
+            },
+        )
 
     def _reconcile_opening_event(self, execution: DetectionExecution) -> None:
         site_id = execution.result.site_id

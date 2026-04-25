@@ -47,6 +47,21 @@ class StubNotifier:
         )
 
 
+class StubEmailNotifier:
+    def __init__(self) -> None:
+        self.events = []
+
+    def send(self, event):
+        self.events.append(event)
+        return (
+            NotificationDelivery(
+                notifier="StubEmailNotifier",
+                delivery_kind="email",
+                succeeded=True,
+            ),
+        )
+
+
 class StubProfile:
     site_id = "studentvillage"
     display_name = "Student Village"
@@ -58,6 +73,7 @@ def make_config(
     *,
     detector_only: bool = True,
     reminder_minutes: int = 15,
+    email_enabled: bool = False,
 ) -> AppConfig:
     return AppConfig(
         database_path=base_dir / "state.db",
@@ -70,14 +86,14 @@ def make_config(
             enable_console=False,
             webhook_url=None,
             webhook_timeout_seconds=10,
-            email_enabled=False,
-            smtp_host=None,
+            email_enabled=email_enabled,
+            smtp_host="smtp.example.com" if email_enabled else None,
             smtp_port=587,
-            smtp_username=None,
-            smtp_password=None,
+            smtp_username="alerts@example.com" if email_enabled else None,
+            smtp_password="secret" if email_enabled else None,
             smtp_starttls=True,
-            email_from=None,
-            email_to=(),
+            email_from="alerts@example.com" if email_enabled else None,
+            email_to=("demirguven178@gmail.com",) if email_enabled else (),
             alert_reminder_minutes=reminder_minutes,
         ),
         browser=BrowserSettings(headless=True, slow_mo_ms=0),
@@ -104,6 +120,8 @@ def make_execution(
     *,
     state: DetectorState = DetectorState.OPEN,
     fingerprint: str = "fingerprint-1",
+    signals: tuple[str, ...] | None = None,
+    metadata: dict[str, object] | None = None,
 ) -> DetectionExecution:
     result = DetectionResult(
         site_id="studentvillage",
@@ -117,7 +135,7 @@ def make_execution(
             "drift_risk": 0.0,
         },
         state_version="test.v1",
-        signals=("closed_banners_removed",),
+        signals=signals or ("closed_banners_removed",),
         facts=("Observed open state.",),
         inferences=("The site appears open.",),
         uncertainties=(),
@@ -125,6 +143,7 @@ def make_execution(
         page_urls=("https://studentvillage.ch/en/apply/",),
         timestamp_utc=utcnow_iso(),
         fingerprint=fingerprint,
+        metadata=metadata or {},
     )
     return DetectionExecution(result=result, probes=())
 
@@ -199,6 +218,38 @@ def test_closed_state_closes_active_opening(tmp_path: Path) -> None:
     service.inspect_site("studentvillage")
 
     assert service.list_openings(active_only=True) == ()
+
+
+def test_watched_closed_text_missing_sends_email_even_when_state_is_closed(tmp_path: Path) -> None:
+    config = make_config(tmp_path, detector_only=True, email_enabled=True)
+    notifier = StubEmailNotifier()
+    store = SQLiteStateStore(config.database_path)
+    execution = make_execution(
+        state=DetectorState.CLOSED,
+        fingerprint="watched-text-missing-1",
+        signals=("watched_closed_text_missing", "apply_closed_banner_present"),
+        metadata={
+            "watched_closed_text": "Currently all rooms are rented. We do not have a waiting list. If you have any questions, please contact service@livit.ch.",
+            "watched_closed_text_status": "missing",
+        },
+    )
+    service = DormAlertService(
+        config=config,
+        profiles={"studentvillage": StubProfile()},
+        detector=StubDetector(execution),
+        store=store,
+        artifacts=ArtifactManager(config.artifacts_dir),
+        notifier=notifier,
+        verifier=RuleBasedVerifier(config),
+    )
+
+    service.inspect_site("studentvillage")
+    service.inspect_site("studentvillage")
+
+    events = [event for event in notifier.events if event.event_type == "closed_text_missing_alert"]
+    assert len(events) == 1
+    assert events[0].payload["observed_status"] == "missing"
+    assert "does not prove the waitlist is open" in events[0].message
 
 
 def test_monitor_started_notification_is_sent_once_when_requested(tmp_path: Path) -> None:

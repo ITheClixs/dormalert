@@ -16,13 +16,17 @@ class SMTPEmailNotifier:
         "opening_reminder",
         "email_test",
         "monitor_started",
+        "closed_text_missing_alert",
     }
     _PAYLOAD_FIELDS = (
         ("event_id", "Event ID"),
         ("confidence", "Confidence"),
+        ("observed_status", "Observed status"),
+        ("expected_text", "Expected monitored text"),
         ("state_reason", "State reason"),
         ("signals", "Signals"),
         ("facts", "Facts"),
+        ("inferences", "Inferences"),
         ("anti_bot", "Anti-bot signals"),
         ("page_urls", "Page URLs"),
         ("evidence_paths", "Evidence paths"),
@@ -106,6 +110,9 @@ class SMTPEmailNotifier:
         reason_by_type = {
             "email_test": "DormAlert sent this because the SMTP test command was run.",
             "monitor_started": "DormAlert sent this because the continuous monitor process started.",
+            "closed_text_missing_alert": (
+                "DormAlert sent this because a monitored closed/waitlist text disappeared or changed."
+            ),
         }
         reason = reason_by_type.get(
             event.event_type,

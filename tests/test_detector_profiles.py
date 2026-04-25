@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from src.detector.antibot import merge_observations
 from src.detector.models import AntiBotObservation, AntiBotSeverity, DetectorState, ProbeResult
-from src.detector.profile import LivingScienceProfile, StudentVillageProfile
+from src.detector.profile import (
+    LivingScienceProfile,
+    StudentVillageProfile,
+    WATCHED_CLOSED_TEXT_MISSING_SIGNAL,
+    WATCHED_CLOSED_TEXT_PRESENT_SIGNAL,
+)
 
 
 def make_probe(name: str, url: str, html: str) -> ProbeResult:
@@ -36,6 +41,27 @@ def test_livingscience_closed_state_detected() -> None:
     assert "closed_phrase_present" in result.signals
 
 
+def test_livingscience_english_watched_text_present() -> None:
+    profile = LivingScienceProfile()
+    probe = make_probe(
+        "living_en",
+        "https://livingscience.ch/wohnen-studieren-zuerich/?L=1",
+        """
+        <html><body>
+        <h1>Online application</h1>
+        <p>Our waiting lists for rooms and studios are currently full. We are temporarily unable to accept new registrations.
+        As soon as the waiting list is open again, the registration form will be available again. Thank you for your understanding</p>
+        </body></html>
+        """,
+    )
+
+    result = profile.classify({"living_en": probe}, AntiBotObservation(AntiBotSeverity.NONE))
+
+    assert result.state is DetectorState.CLOSED
+    assert WATCHED_CLOSED_TEXT_PRESENT_SIGNAL in result.signals
+    assert result.metadata["watched_closed_text_status"] == "present"
+
+
 def test_livingscience_open_candidate_without_form() -> None:
     profile = LivingScienceProfile()
     probe = make_probe(
@@ -45,6 +71,7 @@ def test_livingscience_open_candidate_without_form() -> None:
     )
     result = profile.classify({"home": probe}, AntiBotObservation(AntiBotSeverity.NONE))
     assert result.state is DetectorState.OPENING_CANDIDATE
+    assert WATCHED_CLOSED_TEXT_MISSING_SIGNAL in result.signals
 
 
 def test_studentvillage_closed_state_uses_banners_not_form_presence() -> None:
@@ -55,7 +82,7 @@ def test_studentvillage_closed_state_uses_banners_not_form_presence() -> None:
             "apply",
             "https://studentvillage.ch/en/apply/",
             """
-            <p>Currently all rooms are rented. We do not have a waiting list.</p>
+            <p>Currently all rooms are rented. We do not have a waiting list. If you have any questions, please contact service@livit.ch.</p>
             <form id="register_form">
               <input type="hidden" name="form_token" value="abc123">
               <input type="submit" value="Register" onclick="return regformhash(...)">
@@ -72,6 +99,7 @@ def test_studentvillage_closed_state_uses_banners_not_form_presence() -> None:
     assert result.state is DetectorState.CLOSED
     assert "register_form_present" in result.signals
     assert "apply_closed_banner_present" in result.signals
+    assert WATCHED_CLOSED_TEXT_PRESENT_SIGNAL in result.signals
 
 
 def test_studentvillage_open_requires_banner_removal_across_pages() -> None:
@@ -93,6 +121,36 @@ def test_studentvillage_open_requires_banner_removal_across_pages() -> None:
     result = profile.classify(probes, AntiBotObservation(AntiBotSeverity.INFO))
     assert result.state is DetectorState.OPEN
     assert "closed_banners_removed" in result.signals
+    assert WATCHED_CLOSED_TEXT_MISSING_SIGNAL in result.signals
+
+
+def test_studentvillage_watched_text_change_alerts_even_if_short_closed_banner_remains() -> None:
+    profile = StudentVillageProfile()
+    probes = {
+        "home": make_probe("home", "https://studentvillage.ch/en/", "<p>All rooms are currently occupied</p>"),
+        "apply": make_probe(
+            "apply",
+            "https://studentvillage.ch/en/apply/",
+            """
+            <p>Currently all rooms are rented. We do not have a waiting list.</p>
+            <form id="register_form">
+              <input type="hidden" name="form_token" value="abc123">
+            </form>
+            """,
+        ),
+        "contact": make_probe(
+            "contact",
+            "https://studentvillage.ch/en/contact/",
+            "<p>There are currently no rooms available and we do not have a waiting list.</p>",
+        ),
+    }
+
+    result = profile.classify(probes, AntiBotObservation(AntiBotSeverity.INFO))
+
+    assert result.state is DetectorState.CLOSED
+    assert "apply_closed_banner_present" in result.signals
+    assert WATCHED_CLOSED_TEXT_MISSING_SIGNAL in result.signals
+    assert result.metadata["watched_closed_text_status"] == "missing"
 
 
 def test_antibot_merge_keeps_highest_severity() -> None:
@@ -317,4 +375,3 @@ def test_livingscience_markers_do_not_match_across_a_period() -> None:
     result = profile.classify({"home": probe}, AntiBotObservation(AntiBotSeverity.NONE))
 
     assert result.state is DetectorState.OPENING_CANDIDATE
-
