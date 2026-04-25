@@ -140,7 +140,7 @@ DORMALERT_SMTP_USERNAME=your-sender@gmail.com
 DORMALERT_SMTP_PASSWORD=your-google-app-password
 DORMALERT_SMTP_STARTTLS=true
 DORMALERT_EMAIL_FROM=your-sender@gmail.com
-DORMALERT_EMAIL_TO=demirguven178@gmail.com
+DORMALERT_EMAIL_TO=your-receiver@gmail.com
 DORMALERT_ALERT_REMINDER_MINUTES=15
 ```
 
