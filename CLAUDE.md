@@ -68,6 +68,7 @@ An **OpeningEvent** is a persisted record separate from runtime state. One activ
 ### Submission safety gates
 
 `_handle_submission` enforces, in order:
+
 1. `detector_only` global flag OR per-site `SubmissionMode.DISABLED` → notify `manual_action_required`, stop.
 2. Live mode + anti-bot `warning` severity → notify `manual_action_required`, stop.
 3. Anti-bot `blocking` severity → `SubmissionStatus.BLOCKED`, never attempts.
