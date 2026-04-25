@@ -210,6 +210,24 @@ def test_livingscience_closed_state_tolerant_to_minor_phrase_edits() -> None:
     assert "closed_phrase_markers_present" in result.signals
 
 
+def test_studentvillage_open_requires_register_form_present_on_apply_page() -> None:
+    profile = StudentVillageProfile()
+    probes = {
+        "home": make_probe("home", "https://studentvillage.ch/en/", "<p>Welcome to Student Village</p>" + "x" * 600),
+        "apply": make_probe(
+            "apply",
+            "https://studentvillage.ch/en/apply/",
+            "<p>We are updating the application experience. Please check back shortly.</p>" + "x" * 600,
+        ),
+        "contact": make_probe("contact", "https://studentvillage.ch/en/contact/", "<p>Application support</p>" + "x" * 600),
+    }
+
+    result = profile.classify(probes, AntiBotObservation(AntiBotSeverity.INFO))
+
+    assert result.state is DetectorState.OPENING_CANDIDATE
+    assert "register_form_missing" in result.signals
+
+
 def test_fingerprint_changes_when_state_version_changes(monkeypatch) -> None:
     profile = StudentVillageProfile()
     probes = {

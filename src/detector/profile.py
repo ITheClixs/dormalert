@@ -268,22 +268,50 @@ class StudentVillageProfile(SiteProfile):
             )
 
         if not apply_closed and not home_closed and not contact_closed:
+            if register_form_present and form_token_present:
+                inferences.append(
+                    "The monitored closed-state language disappeared across the public pages while the apply path remains present, "
+                    "and the register form with its hidden form_token is still exposed."
+                )
+                uncertainties.append(
+                    "The final successful post-submit confirmation text still needs to be validated in live operation."
+                )
+                return self._result(
+                    state=DetectorState.OPEN,
+                    confidence=0.92,
+                    state_reason="closed_banners_removed_and_register_form_present",
+                    signal_scores={
+                        "closed_marker_strength": 0.0,
+                        "open_marker_strength": 0.9,
+                        "drift_risk": 0.15,
+                    },
+                    signals=tuple(signals + ["closed_banners_removed"]),
+                    facts=tuple(facts),
+                    inferences=tuple(inferences),
+                    uncertainties=tuple(uncertainties),
+                    anti_bot=anti_bot,
+                    probes=probes,
+                )
+
+            signals.append("register_form_missing")
             inferences.append(
-                "The monitored closed-state language disappeared across the public pages while the apply path remains present."
+                "Closed banners are absent across the monitored pages, but the expected register form "
+                "structure on the apply page is not present. This could be a redesign or a partial outage, "
+                "not a genuine opening."
             )
             uncertainties.append(
-                "The final successful post-submit confirmation text still needs to be validated in live operation."
+                "Without the known register form markers, the apply flow cannot be treated as open."
             )
             return self._result(
-                state=DetectorState.OPEN,
-                confidence=0.92,
-                state_reason="closed_banners_removed_across_monitored_pages",
+                state=DetectorState.OPENING_CANDIDATE,
+                confidence=0.55,
+                state_reason="banners_removed_but_register_form_missing",
                 signal_scores={
                     "closed_marker_strength": 0.0,
-                    "open_marker_strength": 0.9,
-                    "drift_risk": 0.15,
+                    "open_marker_strength": 0.4,
+                    "drift_risk": 0.8,
                 },
-                signals=tuple(signals + ["closed_banners_removed"]),
+                signals=tuple(signals),
                 facts=tuple(facts),
                 inferences=tuple(inferences),
                 uncertainties=tuple(uncertainties),
