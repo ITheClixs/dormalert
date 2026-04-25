@@ -110,16 +110,14 @@ class LivingScienceProfile(SiteProfile):
         anti_bot: AntiBotObservation,
     ) -> DetectionResult:
         probe = probes["home"]
-        html_lower = probe.text.lower()
         text_lower = _normalize_text(_html_text(probe.text))
 
         closed_visible = self._closed_phrase in text_lower
-        form_visible = bool(re.search(r"<form\b", html_lower)) or "tx_powermail" in html_lower
 
-        facts = [
+        facts: list[str] = [
             "Observed April 23, 2026 closed phrase location on the public page is directly monitorable in HTML.",
         ]
-        signals = []
+        signals: list[str] = []
         inferences: list[str] = []
         uncertainties: list[str] = []
 
@@ -143,41 +141,19 @@ class LivingScienceProfile(SiteProfile):
                 probes=probes,
             )
 
-        if form_visible:
-            signals.extend(["closed_phrase_absent", "form_marker_present"])
-            facts.append("A form marker is visible on the monitored page.")
-            inferences.append(
-                "Because the prior closed banner disappeared and a form marker is now visible, the application flow may be open."
-            )
-            uncertainties.append("The reopened form has not yet been validated against a real successful submission.")
-            return self._result(
-                state=DetectorState.OPEN,
-                confidence=0.9,
-                state_reason="closed_phrase_absent_and_form_marker_present",
-                signal_scores={
-                    "closed_marker_strength": 0.0,
-                    "open_marker_strength": 0.95,
-                    "drift_risk": 0.1,
-                },
-                signals=tuple(signals),
-                facts=tuple(facts),
-                inferences=tuple(inferences),
-                uncertainties=tuple(uncertainties),
-                anti_bot=anti_bot,
-                probes=probes,
-            )
-
         signals.append("closed_phrase_absent")
         inferences.append(
-            "The closed phrase is gone, but no strong public form marker is visible yet."
+            "The closed phrase is gone, but the reopened application form has not yet been characterized in production. "
+            "Holding at opening_candidate until an operator verifies the live open-state markup."
         )
         uncertainties.append(
-            "The page may have changed for reasons other than the waitlist reopening."
+            "The page may have changed for reasons other than the waitlist reopening "
+            "(CMS edit, site redesign, A/B test, incidental form on the page)."
         )
         return self._result(
             state=DetectorState.OPENING_CANDIDATE,
             confidence=0.6,
-            state_reason="closed_phrase_absent_without_strong_open_marker",
+            state_reason="closed_phrase_absent_pending_operator_verification",
             signal_scores={
                 "closed_marker_strength": 0.0,
                 "open_marker_strength": 0.35,

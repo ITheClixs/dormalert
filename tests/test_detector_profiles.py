@@ -169,6 +169,28 @@ def test_fingerprint_text_strips_scripts_styles_comments_and_hidden_values() -> 
     assert "build timestamp" not in output
 
 
+def test_livingscience_does_not_fire_open_on_incidental_form() -> None:
+    profile = LivingScienceProfile()
+    probe = make_probe(
+        "home",
+        "https://livingscience.ch/wohnen-studieren-zuerich/?L=0",
+        """
+        <html><body>
+        <h1>Online bewerben</h1>
+        <p>Bitte pruefen Sie spaeter erneut.</p>
+        <form id="newsletter-signup" class="tx_powermail">
+          <input type="email" name="email">
+        </form>
+        </body></html>
+        """,
+    )
+
+    result = profile.classify({"home": probe}, AntiBotObservation(AntiBotSeverity.NONE))
+
+    assert result.state is DetectorState.OPENING_CANDIDATE
+    assert result.signal_scores["open_marker_strength"] < 0.9
+
+
 def test_fingerprint_changes_when_state_version_changes(monkeypatch) -> None:
     profile = StudentVillageProfile()
     probes = {
