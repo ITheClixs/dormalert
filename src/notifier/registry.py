@@ -4,6 +4,7 @@ import logging
 
 from src.config.models import AppConfig
 from src.notifier.base import CompositeNotifier
+from src.notifier.callmebot import CallMeBotWhatsAppNotifier
 from src.notifier.email_smtp import SMTPEmailNotifier
 from src.notifier.stdout import StdoutNotifier
 from src.notifier.webhook import WebhookNotifier
@@ -21,6 +22,20 @@ def build_notifier(config: AppConfig) -> CompositeNotifier:
             WebhookNotifier(
                 webhook_url=config.notification.webhook_url,
                 timeout_seconds=config.notification.webhook_timeout_seconds,
+            )
+        )
+
+    if config.notification.whatsapp_enabled:
+        if not (config.notification.whatsapp_phone and config.notification.whatsapp_apikey):
+            raise ValueError(
+                "WhatsApp notifier is enabled but DORMALERT_WHATSAPP_PHONE and "
+                "DORMALERT_WHATSAPP_APIKEY are required."
+            )
+        notifiers.append(
+            CallMeBotWhatsAppNotifier(
+                phone=config.notification.whatsapp_phone,
+                apikey=config.notification.whatsapp_apikey,
+                timeout_seconds=config.notification.whatsapp_timeout_seconds,
             )
         )
 

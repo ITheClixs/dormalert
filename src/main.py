@@ -85,6 +85,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("test-email", help="Send a test email through the configured SMTP notifier")
 
+    subparsers.add_parser("test-whatsapp", help="Send a test WhatsApp message through the CallMeBot notifier")
+
     subparsers.add_parser("status", help="Show runtime status")
 
     return parser
@@ -181,6 +183,32 @@ def main() -> None:
             )
         )
         print(json.dumps(to_jsonable(deliveries), indent=2, ensure_ascii=True))
+        return
+
+    if args.command == "test-whatsapp":
+        if not service.config.notification.whatsapp_enabled:
+            raise SystemExit(
+                "DORMALERT_WHATSAPP_ENABLED must be true (with DORMALERT_WHATSAPP_PHONE and "
+                "DORMALERT_WHATSAPP_APIKEY) before running test-whatsapp."
+            )
+        deliveries = service.notifier.send(
+            NotificationEvent(
+                event_type="whatsapp_test",
+                site_id="system",
+                title="DormAlert WhatsApp test",
+                message=(
+                    "This is a DormAlert WhatsApp test message. Receiving it confirms the "
+                    "CallMeBot relay is working before a real waitlist opening."
+                ),
+                severity=NotificationSeverity.INFO,
+            )
+        )
+        print(json.dumps(to_jsonable(deliveries), indent=2, ensure_ascii=True))
+        if not any(
+            delivery.delivery_kind == "whatsapp" and delivery.succeeded
+            for delivery in deliveries
+        ):
+            raise SystemExit("WhatsApp test ran, but no WhatsApp delivery succeeded.")
         return
 
     if args.command == "status":

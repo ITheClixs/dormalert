@@ -25,6 +25,10 @@ class NotificationSettings:
     email_from: str | None
     email_to: tuple[str, ...]
     alert_reminder_minutes: int
+    whatsapp_enabled: bool = False
+    whatsapp_phone: str | None = None
+    whatsapp_apikey: str | None = None
+    whatsapp_timeout_seconds: int = 15
 
 
 @dataclass(frozen=True)

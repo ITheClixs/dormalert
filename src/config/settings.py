@@ -115,6 +115,10 @@ def load_settings(env_file: str | Path = ".env") -> AppConfig:
             email_from=os.environ.get("DORMALERT_EMAIL_FROM") or None,
             email_to=get_csv("DORMALERT_EMAIL_TO") or DEFAULT_ALERT_RECIPIENTS,
             alert_reminder_minutes=get_int("DORMALERT_ALERT_REMINDER_MINUTES", 15),
+            whatsapp_enabled=get_bool("DORMALERT_WHATSAPP_ENABLED", False),
+            whatsapp_phone=os.environ.get("DORMALERT_WHATSAPP_PHONE") or None,
+            whatsapp_apikey=os.environ.get("DORMALERT_WHATSAPP_APIKEY") or None,
+            whatsapp_timeout_seconds=get_int("DORMALERT_WHATSAPP_TIMEOUT_SECONDS", 15),
         ),
         browser=BrowserSettings(
             headless=get_bool("DORMALERT_BROWSER_HEADLESS", True),
