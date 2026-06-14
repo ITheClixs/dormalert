@@ -87,6 +87,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("test-whatsapp", help="Send a test WhatsApp message through the CallMeBot notifier")
 
+    subparsers.add_parser("test-telegram", help="Send a test message through the Telegram bot notifier")
+
     subparsers.add_parser("status", help="Show runtime status")
 
     return parser
@@ -209,6 +211,32 @@ def main() -> None:
             for delivery in deliveries
         ):
             raise SystemExit("WhatsApp test ran, but no WhatsApp delivery succeeded.")
+        return
+
+    if args.command == "test-telegram":
+        if not service.config.notification.telegram_enabled:
+            raise SystemExit(
+                "DORMALERT_TELEGRAM_ENABLED must be true (with DORMALERT_TELEGRAM_BOT_TOKEN and "
+                "DORMALERT_TELEGRAM_CHAT_ID) before running test-telegram."
+            )
+        deliveries = service.notifier.send(
+            NotificationEvent(
+                event_type="telegram_test",
+                site_id="system",
+                title="DormAlert Telegram test",
+                message=(
+                    "This is a DormAlert Telegram test message. Receiving it confirms the "
+                    "Telegram bot is working before a real waitlist opening."
+                ),
+                severity=NotificationSeverity.INFO,
+            )
+        )
+        print(json.dumps(to_jsonable(deliveries), indent=2, ensure_ascii=True))
+        if not any(
+            delivery.delivery_kind == "telegram" and delivery.succeeded
+            for delivery in deliveries
+        ):
+            raise SystemExit("Telegram test ran, but no Telegram delivery succeeded.")
         return
 
     if args.command == "status":

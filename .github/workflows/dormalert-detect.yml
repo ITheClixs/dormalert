@@ -37,12 +37,12 @@ jobs:
       DORMALERT_LOG_DIR: ./logs
       DORMALERT_LOG_LEVEL: INFO
 
-      # WhatsApp (CallMeBot) is the alert channel. Email stays off, so the
-      # orchestrator treats any successful channel (WhatsApp) as the durable one.
+      # Telegram is the alert channel. Email stays off, so the orchestrator
+      # treats any successful channel (Telegram) as the durable one.
       DORMALERT_EMAIL_ENABLED: "false"
-      DORMALERT_WHATSAPP_ENABLED: "true"
-      DORMALERT_WHATSAPP_PHONE: ${{ secrets.DORMALERT_WHATSAPP_PHONE }}
-      DORMALERT_WHATSAPP_APIKEY: ${{ secrets.DORMALERT_WHATSAPP_APIKEY }}
+      DORMALERT_TELEGRAM_ENABLED: "true"
+      DORMALERT_TELEGRAM_BOT_TOKEN: ${{ secrets.DORMALERT_TELEGRAM_BOT_TOKEN }}
+      DORMALERT_TELEGRAM_CHAT_ID: ${{ secrets.DORMALERT_TELEGRAM_CHAT_ID }}
 
       LIVINGSCIENCE_ENABLED: "true"
       LIVINGSCIENCE_SUBMISSION_MODE: disabled

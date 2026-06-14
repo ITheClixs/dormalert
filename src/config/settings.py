@@ -119,6 +119,10 @@ def load_settings(env_file: str | Path = ".env") -> AppConfig:
             whatsapp_phone=os.environ.get("DORMALERT_WHATSAPP_PHONE") or None,
             whatsapp_apikey=os.environ.get("DORMALERT_WHATSAPP_APIKEY") or None,
             whatsapp_timeout_seconds=get_int("DORMALERT_WHATSAPP_TIMEOUT_SECONDS", 15),
+            telegram_enabled=get_bool("DORMALERT_TELEGRAM_ENABLED", False),
+            telegram_bot_token=os.environ.get("DORMALERT_TELEGRAM_BOT_TOKEN") or None,
+            telegram_chat_id=os.environ.get("DORMALERT_TELEGRAM_CHAT_ID") or None,
+            telegram_timeout_seconds=get_int("DORMALERT_TELEGRAM_TIMEOUT_SECONDS", 15),
         ),
         browser=BrowserSettings(
             headless=get_bool("DORMALERT_BROWSER_HEADLESS", True),

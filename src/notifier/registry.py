@@ -7,6 +7,7 @@ from src.notifier.base import CompositeNotifier
 from src.notifier.callmebot import CallMeBotWhatsAppNotifier
 from src.notifier.email_smtp import SMTPEmailNotifier
 from src.notifier.stdout import StdoutNotifier
+from src.notifier.telegram import TelegramNotifier
 from src.notifier.webhook import WebhookNotifier
 
 
@@ -36,6 +37,20 @@ def build_notifier(config: AppConfig) -> CompositeNotifier:
                 phone=config.notification.whatsapp_phone,
                 apikey=config.notification.whatsapp_apikey,
                 timeout_seconds=config.notification.whatsapp_timeout_seconds,
+            )
+        )
+
+    if config.notification.telegram_enabled:
+        if not (config.notification.telegram_bot_token and config.notification.telegram_chat_id):
+            raise ValueError(
+                "Telegram notifier is enabled but DORMALERT_TELEGRAM_BOT_TOKEN and "
+                "DORMALERT_TELEGRAM_CHAT_ID are required."
+            )
+        notifiers.append(
+            TelegramNotifier(
+                bot_token=config.notification.telegram_bot_token,
+                chat_id=config.notification.telegram_chat_id,
+                timeout_seconds=config.notification.telegram_timeout_seconds,
             )
         )
 

@@ -29,6 +29,10 @@ class NotificationSettings:
     whatsapp_phone: str | None = None
     whatsapp_apikey: str | None = None
     whatsapp_timeout_seconds: int = 15
+    telegram_enabled: bool = False
+    telegram_bot_token: str | None = None
+    telegram_chat_id: str | None = None
+    telegram_timeout_seconds: int = 15
 
 
 @dataclass(frozen=True)
