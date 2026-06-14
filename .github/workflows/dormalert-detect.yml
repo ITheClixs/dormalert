@@ -1,0 +1,75 @@
+name: DormAlert Detect
+
+on:
+  workflow_dispatch:
+    inputs:
+      site:
+        description: Site to check
+        required: true
+        default: livingscience
+        type: choice
+        options:
+          - livingscience
+          - studentvillage
+
+concurrency:
+  group: dormalert-detect-${{ github.event.inputs.site || 'livingscience' }}
+  cancel-in-progress: false
+
+jobs:
+  detect:
+    name: Run one DormAlert detection
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    env:
+      DORMALERT_DETECTOR_ONLY: "true"
+      DORMALERT_EMAIL_ENABLED: "true"
+      DORMALERT_ENABLE_CONSOLE_NOTIFIER: "true"
+      DORMALERT_DATABASE_PATH: ./artifacts/dormalert.db
+      DORMALERT_ARTIFACTS_DIR: ./artifacts
+      DORMALERT_LOG_DIR: ./logs
+      DORMALERT_LOG_LEVEL: INFO
+
+      DORMALERT_SMTP_HOST: ${{ secrets.DORMALERT_SMTP_HOST }}
+      DORMALERT_SMTP_PORT: ${{ secrets.DORMALERT_SMTP_PORT }}
+      DORMALERT_SMTP_USERNAME: ${{ secrets.DORMALERT_SMTP_USERNAME }}
+      DORMALERT_SMTP_PASSWORD: ${{ secrets.DORMALERT_SMTP_PASSWORD }}
+      DORMALERT_SMTP_STARTTLS: "true"
+      DORMALERT_EMAIL_FROM: ${{ secrets.DORMALERT_EMAIL_FROM }}
+      DORMALERT_EMAIL_TO: ${{ secrets.DORMALERT_EMAIL_TO }}
+
+      LIVINGSCIENCE_ENABLED: "true"
+      LIVINGSCIENCE_SUBMISSION_MODE: disabled
+      LIVINGSCIENCE_TIMEOUT_SECONDS: "20"
+      LIVINGSCIENCE_MAX_RETRIES: "2"
+
+      STUDENTVILLAGE_ENABLED: "false"
+      STUDENTVILLAGE_SUBMISSION_MODE: disabled
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Run one detection cycle
+        run: python -m src.main detect-once --site "${{ inputs.site }}" --detector-only
+
+      - name: Upload detection evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dormalert-evidence-${{ github.run_id }}
+          path: |
+            artifacts/
+            logs/
+          if-no-files-found: ignore
+          retention-days: 7

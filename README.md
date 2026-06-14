@@ -234,6 +234,21 @@ python3 -m src.main test-email
 python3 -m src.main simulate-opening --site studentvillage --send-email
 ```
 
+## No-VPS GitHub Actions Mode
+
+For alert-only LivingScience monitoring without a VPS or an always-on local
+computer, use the included GitHub Actions workflow:
+
+```text
+.github/workflows/dormalert-detect.yml
+```
+
+cron-job.org can trigger this workflow through GitHub's `workflow_dispatch`
+API. The workflow runs one detector cycle on a GitHub-hosted runner and sends
+SMTP email when the monitored LivingScience closed/waitlist text disappears or
+changes. See [docs/deployment.md](docs/deployment.md#no-vps-alert-only-deployment)
+for the required GitHub secrets, PAT permissions, and cron-job.org request.
+
 ## Documentation index
 
 - [Technical reconnaissance](docs/reconnaissance.md)
