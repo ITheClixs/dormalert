@@ -89,6 +89,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("test-telegram", help="Send a test message through the Telegram bot notifier")
 
+    subparsers.add_parser(
+        "send-heartbeat",
+        help="Send a scheduled heartbeat email proving the monitor and email channel are alive",
+    )
+
     subparsers.add_parser("status", help="Show runtime status")
 
     return parser
@@ -237,6 +242,40 @@ def main() -> None:
             for delivery in deliveries
         ):
             raise SystemExit("Telegram test ran, but no Telegram delivery succeeded.")
+        return
+
+    if args.command == "send-heartbeat":
+        snapshot = service.status_snapshot()
+        sites_by_id = {site["site_id"]: site for site in snapshot["sites"]}
+        livingscience = sites_by_id.get("livingscience")
+        if livingscience:
+            detail = (
+                f"livingscience last state: {livingscience['last_page_state']} "
+                f"(workflow {livingscience['last_workflow_state']}, "
+                f"checked {livingscience['last_checked_at']}, "
+                f"consecutive failures {livingscience['consecutive_failures']})."
+            )
+        else:
+            detail = "No detection recorded yet (first cycle pending or the state cache is empty)."
+        deliveries = service.notifier.send(
+            NotificationEvent(
+                event_type="heartbeat",
+                site_id="system",
+                title="DormAlert heartbeat: monitor is alive",
+                message=(
+                    "DormAlert ran its scheduled heartbeat. " + detail + " If you stop receiving "
+                    "this heartbeat email on schedule, assume the monitor is broken and investigate."
+                ),
+                severity=NotificationSeverity.INFO,
+                payload={"active_openings": snapshot["active_openings"]},
+            )
+        )
+        print(json.dumps(to_jsonable(deliveries), indent=2, ensure_ascii=True))
+        if service.config.notification.email_enabled and not any(
+            delivery.delivery_kind == "email" and delivery.succeeded
+            for delivery in deliveries
+        ):
+            raise SystemExit("Heartbeat ran but email delivery failed.")
         return
 
     if args.command == "status":

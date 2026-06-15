@@ -17,6 +17,8 @@ class SMTPEmailNotifier:
         "email_test",
         "monitor_started",
         "closed_text_missing_alert",
+        "repeated_failure",
+        "heartbeat",
     }
     _PAYLOAD_FIELDS = (
         ("event_id", "Event ID"),
@@ -112,6 +114,14 @@ class SMTPEmailNotifier:
             "monitor_started": "DormAlert sent this because the continuous monitor process started.",
             "closed_text_missing_alert": (
                 "DormAlert sent this because a monitored closed/waitlist text disappeared or changed."
+            ),
+            "repeated_failure": (
+                "DormAlert sent this because the detector failed several cycles in a row and may be "
+                "blind to a real opening. Check the site and the GitHub Actions logs."
+            ),
+            "heartbeat": (
+                "DormAlert sent this as its scheduled heartbeat. As long as these arrive on schedule, "
+                "the monitor and the email channel are both working. If they stop, investigate."
             ),
         }
         reason = reason_by_type.get(
