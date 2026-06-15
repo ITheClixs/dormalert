@@ -37,12 +37,21 @@ jobs:
       DORMALERT_LOG_DIR: ./logs
       DORMALERT_LOG_LEVEL: INFO
 
-      # Telegram is the alert channel. Email stays off, so the orchestrator
-      # treats any successful channel (Telegram) as the durable one.
-      DORMALERT_EMAIL_ENABLED: "false"
-      DORMALERT_TELEGRAM_ENABLED: "true"
-      DORMALERT_TELEGRAM_BOT_TOKEN: ${{ secrets.DORMALERT_TELEGRAM_BOT_TOKEN }}
-      DORMALERT_TELEGRAM_CHAT_ID: ${{ secrets.DORMALERT_TELEGRAM_CHAT_ID }}
+      # Email is THE alert channel and the orchestrator's durable channel: an
+      # opening is only marked notified once an email actually goes out.
+      # Sends from demirguven00@gmail.com to demirguven178@gmail.com via Gmail
+      # SMTP. The sender address + Gmail App Password are repo secrets so the
+      # public repo never exposes them.
+      DORMALERT_EMAIL_ENABLED: "true"
+      DORMALERT_SMTP_HOST: smtp.gmail.com
+      DORMALERT_SMTP_PORT: "587"
+      DORMALERT_SMTP_STARTTLS: "true"
+      DORMALERT_SMTP_USERNAME: ${{ secrets.DORMALERT_EMAIL_FROM }}
+      DORMALERT_SMTP_PASSWORD: ${{ secrets.DORMALERT_SMTP_PASSWORD }}
+      DORMALERT_EMAIL_FROM: ${{ secrets.DORMALERT_EMAIL_FROM }}
+      DORMALERT_EMAIL_TO: demirguven178@gmail.com
+      DORMALERT_TELEGRAM_ENABLED: "false"
+      DORMALERT_WHATSAPP_ENABLED: "false"
 
       LIVINGSCIENCE_ENABLED: "true"
       LIVINGSCIENCE_SUBMISSION_MODE: disabled
