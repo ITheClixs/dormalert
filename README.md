@@ -1,4 +1,4 @@
-# DormAlert: Find a student dorm in zurich in only 4 months!!!
+# DormAlert: Find a student dorm in zurich
 
 DormAlert is a production-oriented dormitory opening monitor built around one core subsystem: a page state detector.
 
