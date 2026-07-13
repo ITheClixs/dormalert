@@ -17,6 +17,8 @@ class SMTPEmailNotifier:
         "email_test",
         "monitor_started",
         "closed_text_missing_alert",
+        "availability_change",
+        "manual_action_required",
         "repeated_failure",
         "heartbeat",
     }
@@ -114,6 +116,13 @@ class SMTPEmailNotifier:
             "monitor_started": "DormAlert sent this because the continuous monitor process started.",
             "closed_text_missing_alert": (
                 "DormAlert sent this because a monitored closed/waitlist text disappeared or changed."
+            ),
+            "availability_change": (
+                "DormAlert sent this because a monitored site changed to an opening-candidate state. "
+                "Check the site manually right away."
+            ),
+            "manual_action_required": (
+                "DormAlert sent this because a site appears open and needs your manual action now."
             ),
             "repeated_failure": (
                 "DormAlert sent this because the detector failed several cycles in a row and may be "

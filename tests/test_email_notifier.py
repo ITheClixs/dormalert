@@ -86,20 +86,54 @@ def test_opening_email_uses_transactional_headers(monkeypatch) -> None:
     assert "Page URLs:" in body
 
 
-def test_non_opening_events_are_not_emailed(monkeypatch) -> None:
+def test_low_value_events_are_not_emailed(monkeypatch) -> None:
     FakeSMTP.instances.clear()
     monkeypatch.setattr("src.notifier.email_smtp.smtplib.SMTP", FakeSMTP)
     event = NotificationEvent(
-        event_type="availability_change",
+        event_type="submission_result",
         site_id="studentvillage",
-        title="candidate",
-        message="Opening candidate only.",
-        severity=NotificationSeverity.WARNING,
+        title="submission",
+        message="Dry-run submission finished.",
+        severity=NotificationSeverity.INFO,
     )
 
     _notifier().send(event)
 
     assert FakeSMTP.instances == []
+
+
+def test_availability_change_event_is_emailed(monkeypatch) -> None:
+    FakeSMTP.instances.clear()
+    monkeypatch.setattr("src.notifier.email_smtp.smtplib.SMTP", FakeSMTP)
+    event = NotificationEvent(
+        event_type="availability_change",
+        site_id="livingscience",
+        title="Living Science is opening_candidate",
+        message="Living Science changed to opening_candidate with confidence 0.60.",
+        severity=NotificationSeverity.WARNING,
+    )
+
+    _notifier().send(event)
+
+    assert len(FakeSMTP.instances) == 1
+    assert FakeSMTP.instances[0].messages[0]["Subject"] == "Living Science is opening_candidate"
+
+
+def test_manual_action_required_event_is_emailed(monkeypatch) -> None:
+    FakeSMTP.instances.clear()
+    monkeypatch.setattr("src.notifier.email_smtp.smtplib.SMTP", FakeSMTP)
+    event = NotificationEvent(
+        event_type="manual_action_required",
+        site_id="livingscience",
+        title="Living Science appears open",
+        message="Living Science appears open but automatic submission is not active.",
+        severity=NotificationSeverity.CRITICAL,
+    )
+
+    _notifier().send(event)
+
+    assert len(FakeSMTP.instances) == 1
+    assert FakeSMTP.instances[0].messages[0]["Subject"] == "Living Science appears open"
 
 
 def test_manual_email_test_event_is_allowed(monkeypatch) -> None:

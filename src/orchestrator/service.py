@@ -324,31 +324,36 @@ class DormAlertService:
                         "anti_bot": result.anti_bot.signals,
                         "evidence_paths": result.evidence_paths,
                     },
-                )
+                ),
+                dedupe_key=f"availability_change:{result.site_id}:{result.fingerprint}",
             )
 
         previous_failures = runtime.consecutive_failures if runtime else 0
-        if (
-            result.state is DetectorState.FAILED
-            and consecutive_failures >= self.config.failure_alert_threshold
-            and previous_failures < self.config.failure_alert_threshold
-        ):
-            self._notify_once(
-                NotificationEvent(
-                    event_type="repeated_failure",
-                    site_id=result.site_id,
-                    title=f"{result.display_name} detector is failing repeatedly",
-                    message=(
-                        f"{result.display_name} reached {consecutive_failures} consecutive failed detection cycles."
+        threshold = self.config.failure_alert_threshold
+        if result.state is DetectorState.FAILED and consecutive_failures >= threshold:
+            crossing = previous_failures < threshold
+            failure_day = result.timestamp_utc[:10]
+            day_key = f"repeated_failure:{result.site_id}:{failure_day}"
+            if crossing or not self.store.action_exists(day_key):
+                self._notify_once(
+                    NotificationEvent(
+                        event_type="repeated_failure",
+                        site_id=result.site_id,
+                        title=f"{result.display_name} detector is failing repeatedly",
+                        message=(
+                            f"{result.display_name} reached {consecutive_failures} consecutive failed detection "
+                            "cycles. The monitor may be blind to a real opening until this is fixed."
+                        ),
+                        severity=NotificationSeverity.ERROR,
+                        payload={
+                            "facts": result.facts,
+                            "uncertainties": result.uncertainties,
+                            "evidence_paths": result.evidence_paths,
+                        },
                     ),
-                    severity=NotificationSeverity.ERROR,
-                    payload={
-                        "facts": result.facts,
-                        "uncertainties": result.uncertainties,
-                        "evidence_paths": result.evidence_paths,
-                    },
+                    dedupe_key=day_key,
+                    force_send=crossing,
                 )
-            )
 
     def _handle_watched_closed_text_notification(self, result: DetectionResult) -> None:
         if WATCHED_CLOSED_TEXT_MISSING_SIGNAL not in result.signals:
@@ -410,11 +415,21 @@ class DormAlertService:
             },
         )
 
+    def _is_alertable_opening(self, execution: DetectionExecution) -> bool:
+        if execution.result.state is DetectorState.OPEN:
+            return True
+        profile = self.profiles.get(execution.result.site_id)
+        return (
+            execution.result.state is DetectorState.OPENING_CANDIDATE
+            and bool(getattr(profile, "candidate_open_alerts", False))
+            and WATCHED_CLOSED_TEXT_MISSING_SIGNAL in execution.result.signals
+        )
+
     def _reconcile_opening_event(self, execution: DetectionExecution) -> None:
         site_id = execution.result.site_id
         current_opening = self.store.get_current_opening(site_id)
 
-        if execution.result.state is DetectorState.OPEN:
+        if self._is_alertable_opening(execution):
             if current_opening is None:
                 current_opening = self.store.create_opening_event(execution.result)
             elif current_opening.opening_fingerprint != execution.result.fingerprint:
@@ -463,21 +478,41 @@ class DormAlertService:
 
     def _opening_notification(self, opening: OpeningEventRecord, result: DetectionResult) -> NotificationEvent:
         is_initial = opening.last_notified_at is None
+        is_candidate = result.state is DetectorState.OPENING_CANDIDATE
         if is_initial:
             event_type = "opening_alert"
-            title = f"DormAlert: {result.display_name} waitlist is open"
-            message = (
-                f"{result.display_name} reached the confirmed open state with confidence {result.confidence:.2f}. "
-                f"Event #{opening.event_id} was created."
-            )
+            if is_candidate:
+                title = f"DormAlert: {result.display_name} waitlist may be open - check now"
+                message = (
+                    f"The monitored closed-state text for {result.display_name} disappeared and the page "
+                    f"no longer looks closed (confidence {result.confidence:.2f}). Treat this as a live "
+                    f"opening: open the site and register manually right away. "
+                    f"Event #{opening.event_id} was created."
+                )
+            else:
+                title = f"DormAlert: {result.display_name} waitlist is open"
+                message = (
+                    f"{result.display_name} reached the confirmed open state with confidence {result.confidence:.2f}. "
+                    f"Event #{opening.event_id} was created."
+                )
         else:
             reminder_number = max(1, opening.reminder_count)
             event_type = "opening_reminder"
-            title = f"DormAlert reminder {reminder_number}: {result.display_name} waitlist is still open"
-            message = (
-                f"{result.display_name} still has a confirmed open state with confidence {result.confidence:.2f}. "
-                f"Event #{opening.event_id} remains active."
-            )
+            if is_candidate:
+                title = (
+                    f"DormAlert reminder {reminder_number}: {result.display_name} still looks open (unverified)"
+                )
+                message = (
+                    f"The monitored closed-state text for {result.display_name} is still missing "
+                    f"(confidence {result.confidence:.2f}). If you have not registered yet, do it now. "
+                    f"Event #{opening.event_id} remains active."
+                )
+            else:
+                title = f"DormAlert reminder {reminder_number}: {result.display_name} waitlist is still open"
+                message = (
+                    f"{result.display_name} still has a confirmed open state with confidence {result.confidence:.2f}. "
+                    f"Event #{opening.event_id} remains active."
+                )
 
         return NotificationEvent(
             event_type=event_type,
@@ -688,6 +723,7 @@ class DormAlertService:
         self,
         event: NotificationEvent,
         dedupe_key: str | None = None,
+        force_send: bool = False,
     ) -> tuple[NotificationDelivery, ...]:
         key = dedupe_key
         if key is None:
@@ -695,9 +731,20 @@ class DormAlertService:
                 f"{event.event_type}|{event.site_id}|{event.title}|{event.message}".encode("utf-8")
             ).hexdigest()
             key = f"notify:{event.event_type}:{event.site_id}:{digest}"
-        if self.store.action_exists(key):
+        if not force_send and self.store.action_exists(key):
             return ()
         deliveries = self._send_notification(event)
+        if not self._opening_delivery_succeeded(deliveries):
+            self.logger.warning(
+                "Notification did not reach the required delivery channel; it will be retried",
+                extra={
+                    "event": "notification_delivery_failed",
+                    "notification_type": event.event_type,
+                    "site_id": event.site_id,
+                    "dedupe_key": key,
+                },
+            )
+            return deliveries
         self.store.remember_action(
             action_key=key,
             site_id=event.site_id,

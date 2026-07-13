@@ -28,6 +28,28 @@ def _selected_sites(all_site_ids: Iterable[str], requested: list[str] | None) ->
     return requested
 
 
+def _sites_crossing_failure_threshold(records: Iterable, threshold: int) -> list[str]:
+    """Sites whose consecutive failures reached the alert threshold on this cycle.
+
+    Matching exactly the threshold keeps this a one-shot signal per failure
+    episode, so a CI run exits non-zero once instead of on every later cycle.
+    """
+    return [
+        record.site_id
+        for record in records
+        if record.consecutive_failures == threshold
+    ]
+
+
+def _heartbeat_title(livingscience: dict | None, threshold: int) -> str:
+    if livingscience and (
+        livingscience["last_page_state"] == "failed"
+        or livingscience["consecutive_failures"] >= threshold
+    ):
+        return "DormAlert heartbeat: monitor alive but livingscience detection is FAILING"
+    return "DormAlert heartbeat: monitor is alive"
+
+
 def _build_service(detector_only_override: bool | None = None) -> DormAlertService:
     config = load_settings()
     if detector_only_override is True:
@@ -145,6 +167,15 @@ def main() -> None:
         for site_id in _selected_sites(site_ids, args.sites):
             result = service.inspect_site(site_id)
             print(json.dumps(to_jsonable(result), indent=2, ensure_ascii=True))
+        crossing = _sites_crossing_failure_threshold(
+            service.store.list_runtime_records(),
+            service.config.failure_alert_threshold,
+        )
+        if crossing:
+            raise SystemExit(
+                f"Detection reached the failure threshold for: {', '.join(sorted(crossing))}. "
+                "Exiting non-zero so the CI run is marked failed as a backstop alert."
+            )
         return
 
     if args.command == "submit-once":
@@ -261,7 +292,7 @@ def main() -> None:
             NotificationEvent(
                 event_type="heartbeat",
                 site_id="system",
-                title="DormAlert heartbeat: monitor is alive",
+                title=_heartbeat_title(livingscience, service.config.failure_alert_threshold),
                 message=(
                     "DormAlert ran its scheduled heartbeat. " + detail + " If you stop receiving "
                     "this heartbeat email on schedule, assume the monitor is broken and investigate."

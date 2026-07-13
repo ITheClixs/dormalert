@@ -21,6 +21,12 @@ concurrency:
   group: dormalert-detect-${{ github.event.inputs.site || 'livingscience' }}
   cancel-in-progress: false
 
+# actions: write lets the keepalive step re-enable scheduled workflows that
+# GitHub auto-disables after 60 days without repository commits.
+permissions:
+  contents: read
+  actions: write
+
 jobs:
   detect:
     name: Run one DormAlert detection
@@ -107,3 +113,15 @@ jobs:
             logs/
           if-no-files-found: ignore
           retention-days: 7
+
+      # GitHub disables `schedule` triggers on public repos after 60 days
+      # without commits. This run is usually dispatched by cron-job.org, which
+      # survives that, so use it to re-enable both schedules if they were
+      # auto-disabled (no-op while they are still enabled).
+      - name: Keep scheduled workflows enabled
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow enable dormalert-detect.yml --repo "$GITHUB_REPOSITORY" || true
+          gh workflow enable dormalert-heartbeat.yml --repo "$GITHUB_REPOSITORY" || true

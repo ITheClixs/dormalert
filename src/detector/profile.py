@@ -42,6 +42,10 @@ class SiteProfile:
     display_name: str
     targets: tuple[ProbeTarget, ...]
     state_version = "2026-04-23.reliability-v1"
+    # Sites whose open-state markup has never been observed can opt in to full
+    # opening-event treatment (initial alert + reminders + ack) when the
+    # detector reaches OPENING_CANDIDATE with the watched closed text missing.
+    candidate_open_alerts = False
 
     def classify(
         self,
@@ -99,6 +103,7 @@ class SiteProfile:
 class LivingScienceProfile(SiteProfile):
     site_id = "livingscience"
     display_name = "Living Science"
+    candidate_open_alerts = True
     targets = (
         ProbeTarget(
             name="living_en",
