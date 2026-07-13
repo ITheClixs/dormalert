@@ -59,15 +59,14 @@ jobs:
       DORMALERT_EMAIL_TO: demirguven178@gmail.com
       DORMALERT_TELEGRAM_ENABLED: "false"
 
-      # WhatsApp (CallMeBot) is an additive best-effort ping on top of email —
-      # email remains the durable channel the orchestrator requires. It turns
-      # itself on automatically once the CallMeBot secrets exist, so runs stay
-      # green until registration is done. Heartbeats are intentionally not in
-      # the WhatsApp allowlist; only "go check the site now" alerts ping the
-      # phone.
-      DORMALERT_WHATSAPP_ENABLED: ${{ secrets.DORMALERT_WHATSAPP_APIKEY != '' && secrets.DORMALERT_WHATSAPP_PHONE != '' }}
-      DORMALERT_WHATSAPP_PHONE: ${{ secrets.DORMALERT_WHATSAPP_PHONE }}
-      DORMALERT_WHATSAPP_APIKEY: ${{ secrets.DORMALERT_WHATSAPP_APIKEY }}
+      # WhatsApp via Meta's official Cloud API is an additive best-effort ping
+      # on top of email — email remains the durable channel the orchestrator
+      # requires. It turns itself on automatically once all three Cloud API
+      # secrets exist, so runs stay green until setup is done.
+      DORMALERT_WA_CLOUD_ENABLED: ${{ secrets.DORMALERT_WA_CLOUD_TOKEN != '' && secrets.DORMALERT_WA_CLOUD_PHONE_NUMBER_ID != '' && secrets.DORMALERT_WA_CLOUD_TO != '' }}
+      DORMALERT_WA_CLOUD_TOKEN: ${{ secrets.DORMALERT_WA_CLOUD_TOKEN }}
+      DORMALERT_WA_CLOUD_PHONE_NUMBER_ID: ${{ secrets.DORMALERT_WA_CLOUD_PHONE_NUMBER_ID }}
+      DORMALERT_WA_CLOUD_TO: ${{ secrets.DORMALERT_WA_CLOUD_TO }}
 
       LIVINGSCIENCE_ENABLED: "true"
       LIVINGSCIENCE_SUBMISSION_MODE: disabled

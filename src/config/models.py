@@ -29,6 +29,13 @@ class NotificationSettings:
     whatsapp_phone: str | None = None
     whatsapp_apikey: str | None = None
     whatsapp_timeout_seconds: int = 15
+    wa_cloud_enabled: bool = False
+    wa_cloud_token: str | None = None
+    wa_cloud_phone_number_id: str | None = None
+    wa_cloud_to: str | None = None
+    wa_cloud_template: str = "dormalert_alert"
+    wa_cloud_template_lang: str = "en"
+    wa_cloud_timeout_seconds: int = 15
     telegram_enabled: bool = False
     telegram_bot_token: str | None = None
     telegram_chat_id: str | None = None

@@ -224,10 +224,17 @@ def main() -> None:
         return
 
     if args.command == "test-whatsapp":
-        if not service.config.notification.whatsapp_enabled:
+        whatsapp_configured = (
+            service.config.notification.whatsapp_enabled
+            or service.config.notification.wa_cloud_enabled
+        )
+        if not whatsapp_configured:
             raise SystemExit(
-                "DORMALERT_WHATSAPP_ENABLED must be true (with DORMALERT_WHATSAPP_PHONE and "
-                "DORMALERT_WHATSAPP_APIKEY) before running test-whatsapp."
+                "Enable a WhatsApp channel before running test-whatsapp: either "
+                "DORMALERT_WA_CLOUD_ENABLED=true (with DORMALERT_WA_CLOUD_TOKEN, "
+                "DORMALERT_WA_CLOUD_PHONE_NUMBER_ID, DORMALERT_WA_CLOUD_TO) or "
+                "DORMALERT_WHATSAPP_ENABLED=true (CallMeBot, with DORMALERT_WHATSAPP_PHONE "
+                "and DORMALERT_WHATSAPP_APIKEY)."
             )
         deliveries = service.notifier.send(
             NotificationEvent(
@@ -236,7 +243,7 @@ def main() -> None:
                 title="DormAlert WhatsApp test",
                 message=(
                     "This is a DormAlert WhatsApp test message. Receiving it confirms the "
-                    "CallMeBot relay is working before a real waitlist opening."
+                    "WhatsApp channel is working before a real waitlist opening."
                 ),
                 severity=NotificationSeverity.INFO,
             )

@@ -9,6 +9,7 @@ from src.notifier.email_smtp import SMTPEmailNotifier
 from src.notifier.stdout import StdoutNotifier
 from src.notifier.telegram import TelegramNotifier
 from src.notifier.webhook import WebhookNotifier
+from src.notifier.whatsapp_cloud import MetaWhatsAppCloudNotifier
 
 
 def build_notifier(config: AppConfig) -> CompositeNotifier:
@@ -37,6 +38,27 @@ def build_notifier(config: AppConfig) -> CompositeNotifier:
                 phone=config.notification.whatsapp_phone,
                 apikey=config.notification.whatsapp_apikey,
                 timeout_seconds=config.notification.whatsapp_timeout_seconds,
+            )
+        )
+
+    if config.notification.wa_cloud_enabled:
+        if not (
+            config.notification.wa_cloud_token
+            and config.notification.wa_cloud_phone_number_id
+            and config.notification.wa_cloud_to
+        ):
+            raise ValueError(
+                "WhatsApp Cloud notifier is enabled but DORMALERT_WA_CLOUD_TOKEN, "
+                "DORMALERT_WA_CLOUD_PHONE_NUMBER_ID and DORMALERT_WA_CLOUD_TO are required."
+            )
+        notifiers.append(
+            MetaWhatsAppCloudNotifier(
+                access_token=config.notification.wa_cloud_token,
+                phone_number_id=config.notification.wa_cloud_phone_number_id,
+                to=config.notification.wa_cloud_to,
+                template_name=config.notification.wa_cloud_template,
+                template_language=config.notification.wa_cloud_template_lang,
+                timeout_seconds=config.notification.wa_cloud_timeout_seconds,
             )
         )
 

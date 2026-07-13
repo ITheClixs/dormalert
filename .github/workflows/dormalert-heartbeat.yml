@@ -39,11 +39,12 @@ jobs:
       DORMALERT_TELEGRAM_ENABLED: "false"
 
       # Same auto-enable as the detect workflow. The daily heartbeat also goes
-      # to WhatsApp so a silently broken CallMeBot relay is noticed within a
-      # day instead of on opening day.
-      DORMALERT_WHATSAPP_ENABLED: ${{ secrets.DORMALERT_WHATSAPP_APIKEY != '' && secrets.DORMALERT_WHATSAPP_PHONE != '' }}
-      DORMALERT_WHATSAPP_PHONE: ${{ secrets.DORMALERT_WHATSAPP_PHONE }}
-      DORMALERT_WHATSAPP_APIKEY: ${{ secrets.DORMALERT_WHATSAPP_APIKEY }}
+      # to WhatsApp so a silently broken channel (expired token, template
+      # paused) is noticed within a day instead of on opening day.
+      DORMALERT_WA_CLOUD_ENABLED: ${{ secrets.DORMALERT_WA_CLOUD_TOKEN != '' && secrets.DORMALERT_WA_CLOUD_PHONE_NUMBER_ID != '' && secrets.DORMALERT_WA_CLOUD_TO != '' }}
+      DORMALERT_WA_CLOUD_TOKEN: ${{ secrets.DORMALERT_WA_CLOUD_TOKEN }}
+      DORMALERT_WA_CLOUD_PHONE_NUMBER_ID: ${{ secrets.DORMALERT_WA_CLOUD_PHONE_NUMBER_ID }}
+      DORMALERT_WA_CLOUD_TO: ${{ secrets.DORMALERT_WA_CLOUD_TO }}
 
       LIVINGSCIENCE_ENABLED: "true"
       STUDENTVILLAGE_ENABLED: "false"
