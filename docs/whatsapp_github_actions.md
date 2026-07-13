@@ -121,16 +121,34 @@ A successful dispatch returns HTTP **204** with an empty body.
 
 ---
 
-## Alternative: WhatsApp via CallMeBot (flaky)
+## WhatsApp via CallMeBot (additive channel)
 
-If you prefer WhatsApp and CallMeBot is responding:
+WhatsApp is wired as an **additive best-effort ping on top of email** — email
+stays the durable channel the orchestrator requires before it marks an opening
+notified. CallMeBot is a free third-party relay and is sometimes overloaded
+(with a 24h retry penalty), which is why it must not be the only channel.
+
+Setup (one-time, phone in hand):
 
 1. Add the contact **+34 621 34 34 03** (number changes occasionally — confirm at
    https://www.callmebot.com/blog/free-api-whatsapp-messages/).
 2. Send it exactly: `I allow callmebot to send me messages`.
 3. It replies with an API key (e.g. `123456`). If nothing arrives in 2 minutes,
    CallMeBot enforces a 24h retry wait.
-4. Set secrets `DORMALERT_WHATSAPP_PHONE` (your number, `+41...`) and
-   `DORMALERT_WHATSAPP_APIKEY`, and in the workflow set
-   `DORMALERT_WHATSAPP_ENABLED: "true"`.
-5. Verify locally with `python -m src.main test-whatsapp`.
+4. Add repo secrets `DORMALERT_WHATSAPP_PHONE` (your number, `+41...`) and
+   `DORMALERT_WHATSAPP_APIKEY`. **No workflow edit needed** — both workflows
+   auto-enable WhatsApp as soon as both secrets exist.
+5. Verify locally:
+
+   ```bash
+   source .venv/bin/activate
+   export DORMALERT_WHATSAPP_ENABLED=true
+   export DORMALERT_WHATSAPP_PHONE="+41..."
+   export DORMALERT_WHATSAPP_APIKEY="123456"
+   python -m src.main test-whatsapp
+   ```
+
+What pings the phone: opening alerts and reminders, closed-text-disappeared,
+availability changes, manual-action-required, repeated detector failures, and
+the **daily heartbeat** (so a silently broken CallMeBot relay is noticed within
+a day instead of on opening day). Everything else stays on email/console.

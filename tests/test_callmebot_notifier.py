@@ -8,8 +8,9 @@ from src.notifier.callmebot import CallMeBotWhatsAppNotifier
 
 
 class FakeResponse:
-    def __init__(self, status_code: int = 200) -> None:
+    def __init__(self, status_code: int = 200, text: str = "Message queued. You will receive it soon.") -> None:
         self.status_code = status_code
+        self.text = text
 
     def raise_for_status(self) -> None:
         if self.status_code >= 400:
@@ -17,13 +18,14 @@ class FakeResponse:
 
 
 class FakeClient:
-    def __init__(self, status_code: int = 200) -> None:
+    def __init__(self, status_code: int = 200, text: str = "Message queued. You will receive it soon.") -> None:
         self.status_code = status_code
+        self.text = text
         self.calls: list[dict] = []
 
     def get(self, url: str, *, timeout: int, params: dict) -> FakeResponse:
         self.calls.append({"url": url, "timeout": timeout, "params": params})
-        return FakeResponse(self.status_code)
+        return FakeResponse(self.status_code, self.text)
 
 
 def _notifier(client: FakeClient) -> CallMeBotWhatsAppNotifier:
@@ -62,6 +64,13 @@ def test_availability_change_sends_whatsapp() -> None:
     assert len(client.calls) == 1
 
 
+def test_heartbeat_sends_whatsapp_as_channel_proof_of_life() -> None:
+    client = FakeClient()
+    _notifier(client).send(_event("heartbeat"))
+
+    assert len(client.calls) == 1
+
+
 def test_noisy_event_types_are_skipped() -> None:
     client = FakeClient()
     notifier = _notifier(client)
@@ -75,3 +84,16 @@ def test_http_error_propagates_so_delivery_is_marked_failed() -> None:
     client = FakeClient(status_code=500)
     with pytest.raises(httpx.HTTPStatusError):
         _notifier(client).send(_event("closed_text_missing_alert"))
+
+
+def test_error_body_with_http_200_is_marked_failed() -> None:
+    client = FakeClient(status_code=200, text="<html><body>APIKey is invalid.</body></html>")
+    with pytest.raises(RuntimeError):
+        _notifier(client).send(_event("closed_text_missing_alert"))
+
+
+def test_success_body_is_accepted() -> None:
+    client = FakeClient(status_code=200, text="<p>Message queued. You will receive it in a few seconds.</p>")
+    _notifier(client).send(_event("closed_text_missing_alert"))
+
+    assert len(client.calls) == 1

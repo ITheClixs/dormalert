@@ -58,7 +58,16 @@ jobs:
       DORMALERT_EMAIL_FROM: ${{ secrets.DORMALERT_EMAIL_FROM }}
       DORMALERT_EMAIL_TO: demirguven178@gmail.com
       DORMALERT_TELEGRAM_ENABLED: "false"
-      DORMALERT_WHATSAPP_ENABLED: "false"
+
+      # WhatsApp (CallMeBot) is an additive best-effort ping on top of email —
+      # email remains the durable channel the orchestrator requires. It turns
+      # itself on automatically once the CallMeBot secrets exist, so runs stay
+      # green until registration is done. Heartbeats are intentionally not in
+      # the WhatsApp allowlist; only "go check the site now" alerts ping the
+      # phone.
+      DORMALERT_WHATSAPP_ENABLED: ${{ secrets.DORMALERT_WHATSAPP_APIKEY != '' && secrets.DORMALERT_WHATSAPP_PHONE != '' }}
+      DORMALERT_WHATSAPP_PHONE: ${{ secrets.DORMALERT_WHATSAPP_PHONE }}
+      DORMALERT_WHATSAPP_APIKEY: ${{ secrets.DORMALERT_WHATSAPP_APIKEY }}
 
       LIVINGSCIENCE_ENABLED: "true"
       LIVINGSCIENCE_SUBMISSION_MODE: disabled

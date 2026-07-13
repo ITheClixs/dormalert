@@ -20,9 +20,19 @@ class CallMeBotWhatsAppNotifier:
     delivery_kind = "whatsapp"
     endpoint = "https://api.callmebot.com/whatsapp.php"
 
+    # CallMeBot reports some failures as HTTP 200 with the error in the HTML
+    # body, so status-code checks alone would count a lost message as sent.
+    _FAILURE_BODY_MARKERS = (
+        "apikey is invalid",
+        "api key is invalid",
+        "missing parameters",
+        "you are not registered",
+    )
+
     # Only the alerts that mean "go look at the site now" or "the monitor is
-    # broken" are worth a WhatsApp ping. Everything else stays on console/log so
-    # the phone does not get noisy.
+    # broken" are worth a WhatsApp ping, plus the daily heartbeat as proof the
+    # flaky CallMeBot relay itself still works. Everything else stays on
+    # console/log so the phone does not get noisy.
     _ALLOWED_EVENT_TYPES = {
         "opening_alert",
         "opening_reminder",
@@ -30,6 +40,7 @@ class CallMeBotWhatsAppNotifier:
         "availability_change",
         "manual_action_required",
         "repeated_failure",
+        "heartbeat",
         "whatsapp_test",
     }
 
@@ -61,6 +72,15 @@ class CallMeBotWhatsAppNotifier:
             },
         )
         response.raise_for_status()
+        body_lower = response.text.lower()
+        failure_marker = next(
+            (marker for marker in self._FAILURE_BODY_MARKERS if marker in body_lower),
+            None,
+        )
+        if failure_marker is not None:
+            raise RuntimeError(
+                f"CallMeBot rejected the WhatsApp message ('{failure_marker}' in response body)."
+            )
         self.logger.info(
             "WhatsApp notification sent",
             extra={
@@ -68,6 +88,7 @@ class CallMeBotWhatsAppNotifier:
                 "notification_type": event.event_type,
                 "site_id": event.site_id,
                 "status_code": response.status_code,
+                "response_snippet": response.text[:120],
             },
         )
 

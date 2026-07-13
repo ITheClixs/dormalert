@@ -37,7 +37,13 @@ jobs:
       DORMALERT_EMAIL_FROM: ${{ secrets.DORMALERT_EMAIL_FROM }}
       DORMALERT_EMAIL_TO: demirguven178@gmail.com
       DORMALERT_TELEGRAM_ENABLED: "false"
-      DORMALERT_WHATSAPP_ENABLED: "false"
+
+      # Same auto-enable as the detect workflow. The daily heartbeat also goes
+      # to WhatsApp so a silently broken CallMeBot relay is noticed within a
+      # day instead of on opening day.
+      DORMALERT_WHATSAPP_ENABLED: ${{ secrets.DORMALERT_WHATSAPP_APIKEY != '' && secrets.DORMALERT_WHATSAPP_PHONE != '' }}
+      DORMALERT_WHATSAPP_PHONE: ${{ secrets.DORMALERT_WHATSAPP_PHONE }}
+      DORMALERT_WHATSAPP_APIKEY: ${{ secrets.DORMALERT_WHATSAPP_APIKEY }}
 
       LIVINGSCIENCE_ENABLED: "true"
       STUDENTVILLAGE_ENABLED: "false"
