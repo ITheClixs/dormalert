@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 from dataclasses import replace
+from datetime import datetime
 from typing import Iterable
 
 from src.app.runner import ContinuousRunner
@@ -17,8 +18,10 @@ from src.notifier.base import NotificationEvent, NotificationSeverity
 from src.notifier.registry import build_notifier
 from src.orchestrator.service import DormAlertService
 from src.persistence.sqlite_store import SQLiteStateStore
+from src.utils.env import get_int
 from src.utils.logging import configure_logging
 from src.utils.serialization import to_jsonable
+from src.utils.time import parse_utc_iso, utcnow_iso
 from src.verifier.rules import RuleBasedVerifier
 
 
@@ -39,6 +42,43 @@ def _sites_crossing_failure_threshold(records: Iterable, threshold: int) -> list
         for record in records
         if record.consecutive_failures == threshold
     ]
+
+
+def _health_problems(
+    records: Iterable,
+    *,
+    expected_site_ids: list[str],
+    threshold: int,
+    max_age_minutes: int,
+    now: datetime,
+) -> list[str]:
+    """Problems that mean the monitor might miss a real opening.
+
+    Empty list = healthy = no email. This backs the silent daily health check
+    that replaced the always-on heartbeat email.
+    """
+    records_by_site = {record.site_id: record for record in records}
+    problems: list[str] = []
+    for site_id in expected_site_ids:
+        record = records_by_site.get(site_id)
+        if record is None:
+            problems.append(
+                f"{site_id}: no detection state recorded (detect runs may never have executed "
+                "or the state cache was lost)"
+            )
+            continue
+        if record.last_page_state == "failed" or record.consecutive_failures >= threshold:
+            problems.append(
+                f"{site_id}: detector is failing ({record.consecutive_failures} consecutive failures, "
+                f"last state {record.last_page_state})"
+            )
+        age_minutes = (now - parse_utc_iso(record.last_checked_at)).total_seconds() / 60
+        if age_minutes > max_age_minutes:
+            problems.append(
+                f"{site_id}: last checked {int(age_minutes)} minutes ago "
+                f"(expected within {max_age_minutes}); the detect pipeline may have stopped"
+            )
+    return problems
 
 
 def _heartbeat_title(livingscience: dict | None, threshold: int) -> str:
@@ -113,7 +153,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser(
         "send-heartbeat",
-        help="Send a scheduled heartbeat email proving the monitor and email channel are alive",
+        help="Send a heartbeat email proving the monitor and email channel are alive (manual use)",
+    )
+
+    subparsers.add_parser(
+        "check-health",
+        help="Silent health check: email only if the monitor looks broken, otherwise send nothing",
     )
 
     subparsers.add_parser("status", help="Show runtime status")
@@ -315,6 +360,34 @@ def main() -> None:
         ):
             raise SystemExit("Heartbeat ran but email delivery failed.")
         return
+
+    if args.command == "check-health":
+        problems = _health_problems(
+            service.store.list_runtime_records(),
+            expected_site_ids=site_ids,
+            threshold=service.config.failure_alert_threshold,
+            max_age_minutes=get_int("DORMALERT_HEALTH_MAX_AGE_MINUTES", 60),
+            now=parse_utc_iso(utcnow_iso()),
+        )
+        if not problems:
+            print(json.dumps({"healthy": True, "sites": site_ids}, indent=2))
+            return
+        deliveries = service.notifier.send(
+            NotificationEvent(
+                event_type="health_alert",
+                site_id="system",
+                title="DormAlert health check FAILED - the monitor may be blind",
+                message=(
+                    "The daily silent health check found problems. Until they are fixed, "
+                    "a real waitlist opening could go unnoticed. Problems: "
+                    + "; ".join(problems)
+                ),
+                severity=NotificationSeverity.ERROR,
+                payload={"facts": tuple(problems)},
+            )
+        )
+        print(json.dumps(to_jsonable({"healthy": False, "problems": problems, "deliveries": deliveries}), indent=2))
+        raise SystemExit("DormAlert health check failed: " + "; ".join(problems))
 
     if args.command == "status":
         print(json.dumps(to_jsonable(service.status_snapshot()), indent=2, ensure_ascii=True))

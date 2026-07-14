@@ -1,14 +1,28 @@
-name: DormAlert Heartbeat
+name: DormAlert Health Check
 
-# A daily "I am alive" email. As long as it arrives on schedule, the monitor and
-# the email channel both work, so silence on the detect alert genuinely means
-# "still closed" rather than "secretly broken". If email delivery fails the run
-# exits non-zero, so GitHub emails you about the failed workflow as a backstop.
+# Daily SILENT health check: sends NO email while everything works. It emails
+# (and fails the run, so GitHub notifies too) only when the monitor looks
+# broken — detector failing repeatedly, or no successful detection recorded
+# within the last DORMALERT_HEALTH_MAX_AGE_MINUTES. This replaced the daily
+# heartbeat email at the operator's request: the only routine email left is a
+# real waitlist-opening alert.
+#
+# Manual runs can still send a classic "I am alive" heartbeat email via the
+# mode input.
 
 on:
   schedule:
     - cron: "0 7 * * *"
   workflow_dispatch:
+    inputs:
+      mode:
+        description: health = email only on problems; heartbeat = always email
+        required: false
+        default: health
+        type: choice
+        options:
+          - health
+          - heartbeat
 
 concurrency:
   group: dormalert-heartbeat
@@ -16,7 +30,7 @@ concurrency:
 
 jobs:
   heartbeat:
-    name: Send DormAlert heartbeat email
+    name: Run DormAlert health check
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
@@ -27,6 +41,9 @@ jobs:
       DORMALERT_ARTIFACTS_DIR: ./artifacts
       DORMALERT_LOG_DIR: ./logs
       DORMALERT_LOG_LEVEL: INFO
+      # Detect runs every ~5 minutes; anything older than an hour means the
+      # detect pipeline (cron-job.org dispatch + GitHub schedule) has stopped.
+      DORMALERT_HEALTH_MAX_AGE_MINUTES: "60"
 
       DORMALERT_EMAIL_ENABLED: "true"
       DORMALERT_SMTP_HOST: smtp.gmail.com
@@ -38,9 +55,8 @@ jobs:
       DORMALERT_EMAIL_TO: demirguven178@gmail.com
       DORMALERT_TELEGRAM_ENABLED: "false"
 
-      # Same auto-enable as the detect workflow. The daily heartbeat also goes
-      # to WhatsApp so a silently broken channel (expired token, template
-      # paused) is noticed within a day instead of on opening day.
+      # Same auto-enable as the detect workflow: WhatsApp Cloud API joins in
+      # once its secrets exist. Health alerts would then ping the phone too.
       DORMALERT_WA_CLOUD_ENABLED: ${{ secrets.DORMALERT_WA_CLOUD_TOKEN != '' && secrets.DORMALERT_WA_CLOUD_PHONE_NUMBER_ID != '' && secrets.DORMALERT_WA_CLOUD_TO != '' }}
       DORMALERT_WA_CLOUD_TOKEN: ${{ secrets.DORMALERT_WA_CLOUD_TOKEN }}
       DORMALERT_WA_CLOUD_PHONE_NUMBER_ID: ${{ secrets.DORMALERT_WA_CLOUD_PHONE_NUMBER_ID }}
@@ -62,7 +78,7 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
 
-      # Read-only restore so the heartbeat can report the last observed state.
+      # Read-only restore so the health check sees the latest detector state.
       - name: Restore detector state
         uses: actions/cache/restore@v4
         with:
@@ -71,5 +87,10 @@ jobs:
           restore-keys: |
             dormalert-state-livingscience-
 
-      - name: Send heartbeat email
-        run: python -m src.main send-heartbeat
+      - name: Run health check
+        run: |
+          if [ "${{ github.event.inputs.mode }}" = "heartbeat" ]; then
+            python -m src.main send-heartbeat
+          else
+            python -m src.main check-health
+          fi

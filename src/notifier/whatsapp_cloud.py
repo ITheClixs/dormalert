@@ -33,6 +33,7 @@ class MetaWhatsAppCloudNotifier:
         "manual_action_required",
         "repeated_failure",
         "heartbeat",
+        "health_alert",
         "whatsapp_test",
     }
 

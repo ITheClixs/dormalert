@@ -185,6 +185,25 @@ def test_monitor_started_event_is_emailed(monkeypatch) -> None:
     assert "Detector-only mode: True" in body
 
 
+def test_health_alert_event_is_emailed(monkeypatch) -> None:
+    FakeSMTP.instances.clear()
+    monkeypatch.setattr("src.notifier.email_smtp.smtplib.SMTP", FakeSMTP)
+    event = NotificationEvent(
+        event_type="health_alert",
+        site_id="system",
+        title="DormAlert health check FAILED - the monitor may be blind",
+        message="Problems: livingscience: last checked 240 minutes ago.",
+        severity=NotificationSeverity.ERROR,
+        payload={"facts": ("livingscience: last checked 240 minutes ago",)},
+    )
+
+    _notifier().send(event)
+
+    assert len(FakeSMTP.instances) == 1
+    body = FakeSMTP.instances[0].messages[0].get_content()
+    assert "silent daily health check found a problem" in body
+
+
 def test_closed_text_missing_event_is_emailed(monkeypatch) -> None:
     FakeSMTP.instances.clear()
     monkeypatch.setattr("src.notifier.email_smtp.smtplib.SMTP", FakeSMTP)

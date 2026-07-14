@@ -21,6 +21,7 @@ class SMTPEmailNotifier:
         "manual_action_required",
         "repeated_failure",
         "heartbeat",
+        "health_alert",
     }
     _PAYLOAD_FIELDS = (
         ("event_id", "Event ID"),
@@ -131,6 +132,11 @@ class SMTPEmailNotifier:
             "heartbeat": (
                 "DormAlert sent this as its scheduled heartbeat. As long as these arrive on schedule, "
                 "the monitor and the email channel are both working. If they stop, investigate."
+            ),
+            "health_alert": (
+                "DormAlert sent this because its silent daily health check found a problem. "
+                "You normally receive NOTHING from this check - this email means the monitor "
+                "may currently be unable to detect a waitlist opening. Investigate promptly."
             ),
         }
         reason = reason_by_type.get(
